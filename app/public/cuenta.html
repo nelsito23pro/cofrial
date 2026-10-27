@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mi cuenta · Cofrial SpA</title>
+<link href="/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+<link href="/css/styles.css" rel="stylesheet">
+</head>
+<body>
+<div id="cabecera"></div>
+<main class="container pb-5">
+<div id="aviso"></div>
+<div class="row g-4 justify-content-center">
+  <div class="col-md-5"><div class="card border-0 shadow-sm"><div class="card-body">
+    <h4 class="fw-bold">Ingresar</h4>
+    <form id="f-login">
+      <input class="form-control mb-2" name="email" type="email" placeholder="Email" required>
+      <input class="form-control mb-3" name="password" type="password" placeholder="Contraseña" required>
+      <button class="btn btn-primary w-100">Ingresar</button>
+    </form>
+    <p class="small text-muted mt-3 mb-0">Demo B2B: compras@hospitalaraucania.cl · Demo B2C: camila.rojas@mail.cl · Clave: Cliente2026!</p>
+  </div></div></div>
+  <div class="col-md-7"><div class="card border-0 shadow-sm"><div class="card-body">
+    <h4 class="fw-bold">Crear cuenta</h4>
+    <div class="btn-group mb-3" role="group">
+      <input type="radio" class="btn-check" name="tipo" id="t-b2c" value="B2C" checked><label class="btn btn-outline-primary" for="t-b2c">Persona (B2C)</label>
+      <input type="radio" class="btn-check" name="tipo" id="t-b2b" value="B2B"><label class="btn btn-outline-primary" for="t-b2b">Empresa / institución (B2B)</label>
+    </div>
+    <form id="f-reg" class="row g-2">
+      <div class="col-md-6"><input class="form-control" name="nombre" placeholder="Nombre completo / razón social" required></div>
+      <div class="col-md-6 solo-b2b d-none"><input class="form-control" name="rut" placeholder="RUT empresa (ej. 76.123.456-7)"></div>
+      <div class="col-md-6"><input class="form-control" name="email" type="email" placeholder="Email" required></div>
+      <div class="col-md-6"><input class="form-control" name="telefono" placeholder="Teléfono"></div>
+      <div class="col-md-6"><input class="form-control" name="password" type="password" minlength="8" placeholder="Contraseña (mín. 8)" required></div>
+      <div class="col-md-6"><select class="form-select" name="id_comuna" id="comunas" required></select></div>
+      <div class="col-md-8"><input class="form-control" name="calle" placeholder="Calle de despacho" required></div>
+      <div class="col-md-4"><input class="form-control" name="numero" placeholder="Número"></div>
+      <div class="col-12 solo-b2b d-none small text-muted">Las cuentas B2B quedan pendientes hasta que un ejecutivo apruebe la empresa y asigne su lista de precios institucional.</div>
+      <div class="col-12"><button class="btn btn-success w-100">Registrarme</button></div>
+    </form>
+  </div></div></div>
+</div>
+</main>
+<script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="/js/common.js"></script>
+<script>
+const volver = new URLSearchParams(location.search).get("volver") || "/";
+const destino = volver.startsWith("/") ? volver : "/";
+(async () => {
+  await cabecera();
+  (await api("/api/comunas")).forEach((c) => document.getElementById("comunas").insertAdjacentHTML("beforeend", `<option value="${c.id_comuna}">${esc(c.nombre)} (${esc(c.region)})</option>`));
+  document.querySelectorAll("[name=tipo]").forEach((r) => (r.onchange = () =>
+    document.querySelectorAll(".solo-b2b").forEach((e) => e.classList.toggle("d-none", document.getElementById("t-b2c").checked))));
+  document.getElementById("f-login").onsubmit = async (e) => {
+    e.preventDefault();
+    try { await api("/api/auth/login", { method: "POST", body: Object.fromEntries(new FormData(e.target)) }); location.href = destino; }
+    catch (err) { aviso(esc(err.message), "danger"); }
+  };
+  document.getElementById("f-reg").onsubmit = async (e) => {
+    e.preventDefault();
+    const body = Object.fromEntries(new FormData(e.target));
+    body.tipo = document.querySelector("[name=tipo]:checked").value;
+    try {
+      const r = await api("/api/auth/register", { method: "POST", body });
+      if (r.pendiente) { aviso("Cuenta B2B creada. Tu ejecutivo comercial la aprobará en el CRM; mientras tanto puedes revisar el catálogo.", "info"); setTimeout(() => (location.href = "/"), 2500); }
+      else location.href = destino;
+    } catch (err) { aviso(esc(err.message), "danger"); }
+  };
+})();
+</script></body></html>

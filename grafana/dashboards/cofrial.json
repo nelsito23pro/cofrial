@@ -1,0 +1,791 @@
+{
+ "uid": "cofrial-bi",
+ "title": "Cofrial · BI comercial y cadena de frío",
+ "tags": [
+  "cofrial"
+ ],
+ "timezone": "browser",
+ "editable": true,
+ "refresh": "5s",
+ "time": {
+  "from": "now-30m",
+  "to": "now"
+ },
+ "schemaVersion": 39,
+ "version": 1,
+ "panels": [
+  {
+   "id": 1,
+   "type": "stat",
+   "title": "Ventas netas hoy (CLP)",
+   "datasource": {
+    "type": "mysql",
+    "uid": "cofrial-mysql"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "mysql",
+      "uid": "cofrial-mysql"
+     },
+     "format": "table",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT COALESCE(SUM(total_neto),0) AS ventas FROM v_pedido_total WHERE fecha_pedido >= CURDATE() AND estado <> 'Cancelado'"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "currencyUSD",
+     "decimals": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "blue",
+        "value": null
+       }
+      ]
+     },
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value"
+   }
+  },
+  {
+   "id": 2,
+   "type": "stat",
+   "title": "Pedidos hoy",
+   "datasource": {
+    "type": "mysql",
+    "uid": "cofrial-mysql"
+   },
+   "gridPos": {
+    "x": 4,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "mysql",
+      "uid": "cofrial-mysql"
+     },
+     "format": "table",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT COUNT(*) AS pedidos FROM pedido WHERE fecha_pedido >= CURDATE()"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none",
+     "decimals": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "blue",
+        "value": null
+       }
+      ]
+     },
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value"
+   }
+  },
+  {
+   "id": 3,
+   "type": "stat",
+   "title": "% pedidos por web (14 días)",
+   "datasource": {
+    "type": "mysql",
+    "uid": "cofrial-mysql"
+   },
+   "gridPos": {
+    "x": 8,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "mysql",
+      "uid": "cofrial-mysql"
+     },
+     "format": "table",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT ROUND(100*SUM(id_canal=1)/COUNT(*)) AS pct FROM pedido WHERE fecha_pedido >= CURDATE() - INTERVAL 13 DAY"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percent",
+     "decimals": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "blue",
+        "value": null
+       }
+      ]
+     },
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value"
+   }
+  },
+  {
+   "id": 4,
+   "type": "stat",
+   "title": "Alertas de frío (última hora)",
+   "datasource": {
+    "type": "mysql",
+    "uid": "cofrial-mysql"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "mysql",
+      "uid": "cofrial-mysql"
+     },
+     "format": "table",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT COUNT(*) AS alertas FROM telemetria WHERE alerta_ruptura_frio AND fecha_hora >= NOW() - INTERVAL 1 HOUR"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none",
+     "decimals": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "blue",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 1
+       }
+      ]
+     },
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value"
+   }
+  },
+  {
+   "id": 5,
+   "type": "stat",
+   "title": "Camiones transmitiendo (1 min)",
+   "datasource": {
+    "type": "mysql",
+    "uid": "cofrial-mysql"
+   },
+   "gridPos": {
+    "x": 16,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "mysql",
+      "uid": "cofrial-mysql"
+     },
+     "format": "table",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT COUNT(DISTINCT camion_id) AS camiones FROM telemetria WHERE fecha_hora >= NOW() - INTERVAL 1 MINUTE"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none",
+     "decimals": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "blue",
+        "value": null
+       }
+      ]
+     },
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value"
+   }
+  },
+  {
+   "id": 6,
+   "type": "stat",
+   "title": "Requerimientos IA abiertos",
+   "datasource": {
+    "type": "mysql",
+    "uid": "cofrial-mysql"
+   },
+   "gridPos": {
+    "x": 20,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "mysql",
+      "uid": "cofrial-mysql"
+     },
+     "format": "table",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT COUNT(*) AS abiertos FROM requerimiento WHERE NOT resuelto"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none",
+     "decimals": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "blue",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 1
+       }
+      ]
+     },
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value"
+   }
+  },
+  {
+   "id": 7,
+   "type": "timeseries",
+   "title": "Ventas diarias vs. alertas de ruptura de frío (14 días)",
+   "datasource": {
+    "type": "mysql",
+    "uid": "cofrial-mysql"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 4,
+    "w": 14,
+    "h": 9
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "mysql",
+      "uid": "cofrial-mysql"
+     },
+     "format": "time_series",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT UNIX_TIMESTAMP(dia) AS time, ventas_netas AS 'Ventas netas' FROM v_ventas_vs_alertas WHERE dia >= CURDATE() - INTERVAL 13 DAY ORDER BY dia"
+    },
+    {
+     "refId": "B",
+     "datasource": {
+      "type": "mysql",
+      "uid": "cofrial-mysql"
+     },
+     "format": "time_series",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT UNIX_TIMESTAMP(dia) AS time, alertas_frio AS 'Alertas de frío' FROM v_ventas_vs_alertas WHERE dia >= CURDATE() - INTERVAL 13 DAY ORDER BY dia"
+    }
+   ],
+   "timeFrom": "14d",
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "drawStyle": "bars",
+      "fillOpacity": 70,
+      "barAlignment": 0
+     },
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "#1f8ac0"
+     }
+    },
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Alertas de frío"
+      },
+      "properties": [
+       {
+        "id": "custom.drawStyle",
+        "value": "line"
+       },
+       {
+        "id": "custom.axisPlacement",
+        "value": "right"
+       },
+       {
+        "id": "custom.lineWidth",
+        "value": 3
+       },
+       {
+        "id": "custom.fillOpacity",
+        "value": 0
+       },
+       {
+        "id": "custom.pointSize",
+        "value": 7
+       },
+       {
+        "id": "custom.showPoints",
+        "value": "always"
+       },
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "red"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   }
+  },
+  {
+   "id": 8,
+   "type": "piechart",
+   "title": "Ventas por canal",
+   "datasource": {
+    "type": "mysql",
+    "uid": "cofrial-mysql"
+   },
+   "gridPos": {
+    "x": 14,
+    "y": 4,
+    "w": 5,
+    "h": 9
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "mysql",
+      "uid": "cofrial-mysql"
+     },
+     "format": "table",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT canal, SUM(total_neto) AS ventas FROM v_pedido_total WHERE estado <> 'Cancelado' GROUP BY canal"
+    }
+   ],
+   "options": {
+    "reduceOptions": {
+     "values": true,
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": ""
+    },
+    "pieType": "donut",
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    }
+   }
+  },
+  {
+   "id": 9,
+   "type": "barchart",
+   "title": "B2B vs. B2C (ventas netas)",
+   "datasource": {
+    "type": "mysql",
+    "uid": "cofrial-mysql"
+   },
+   "gridPos": {
+    "x": 19,
+    "y": 4,
+    "w": 5,
+    "h": 9
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "mysql",
+      "uid": "cofrial-mysql"
+     },
+     "format": "table",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT tipo_cliente, SUM(total_neto) AS ventas FROM v_pedido_total WHERE estado <> 'Cancelado' GROUP BY tipo_cliente"
+    }
+   ],
+   "options": {
+    "xField": "tipo_cliente",
+    "orientation": "vertical",
+    "legend": {
+     "showLegend": false
+    }
+   }
+  },
+  {
+   "id": 10,
+   "type": "timeseries",
+   "title": "Temperatura de cámara por camión (en vivo)",
+   "datasource": {
+    "type": "mysql",
+    "uid": "cofrial-mysql"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 13,
+    "w": 14,
+    "h": 9
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "mysql",
+      "uid": "cofrial-mysql"
+     },
+     "format": "time_series",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT UNIX_TIMESTAMP(fecha_hora) AS time, camion_id AS metric, temp_camara AS value FROM telemetria WHERE fecha_hora BETWEEN FROM_UNIXTIME($__unixEpochFrom()) AND FROM_UNIXTIME($__unixEpochTo()) ORDER BY fecha_hora"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "celsius",
+     "custom": {
+      "lineWidth": 2,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "right",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   }
+  },
+  {
+   "id": 11,
+   "type": "geomap",
+   "title": "Ubicación actual de la flota (rojo = ruptura de frío)",
+   "datasource": {
+    "type": "mysql",
+    "uid": "cofrial-mysql"
+   },
+   "gridPos": {
+    "x": 14,
+    "y": 13,
+    "w": 10,
+    "h": 9
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "mysql",
+      "uid": "cofrial-mysql"
+     },
+     "format": "table",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT camion_id, lat, lon, temp_camara, combustible_pct, CAST(alerta_ruptura_frio AS UNSIGNED) AS alerta FROM v_ultima_lectura"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "blue",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 1
+       }
+      ]
+     },
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "view": {
+     "id": "coords",
+     "lat": -38.9,
+     "lon": -72.6,
+     "zoom": 7
+    },
+    "controls": {
+     "showZoom": true
+    },
+    "basemap": {
+     "type": "default",
+     "name": "Mapa base"
+    },
+    "layers": [
+     {
+      "type": "markers",
+      "name": "Camiones",
+      "location": {
+       "mode": "coords",
+       "latitude": "lat",
+       "longitude": "lon"
+      },
+      "config": {
+       "showLegend": false,
+       "style": {
+        "size": {
+         "fixed": 9
+        },
+        "color": {
+         "field": "alerta",
+         "fixed": "blue"
+        },
+        "text": {
+         "field": "camion_id",
+         "mode": "field"
+        },
+        "textConfig": {
+         "fontSize": 11,
+         "offsetY": -14
+        }
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": 12,
+   "type": "table",
+   "title": "Últimas alertas de ruptura de frío",
+   "datasource": {
+    "type": "mysql",
+    "uid": "cofrial-mysql"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 22,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "mysql",
+      "uid": "cofrial-mysql"
+     },
+     "format": "table",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT t.fecha_hora AS 'Fecha', t.camion_id AS 'Camión', t.temp_camara AS 'Temp °C', CONCAT(c.temp_min,' a ',c.temp_max) AS 'Rango permitido' FROM telemetria t JOIN camion c ON c.camion_id=t.camion_id WHERE t.alerta_ruptura_frio ORDER BY t.id_lectura DESC LIMIT 20"
+    }
+   ]
+  },
+  {
+   "id": 13,
+   "type": "bargauge",
+   "title": "Pipeline CRM: monto por etapa",
+   "datasource": {
+    "type": "mysql",
+    "uid": "cofrial-mysql"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 22,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "mysql",
+      "uid": "cofrial-mysql"
+     },
+     "format": "table",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT e.nombre AS etapa, COALESCE(SUM(o.monto_estimado),0) AS monto FROM etapa_pipeline e LEFT JOIN oportunidad o ON o.id_etapa=e.id_etapa GROUP BY e.id_etapa, e.nombre ORDER BY e.orden"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "currencyUSD",
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "#ad1457"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "orientation": "horizontal",
+    "displayMode": "basic",
+    "reduceOptions": {
+     "values": true,
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": ""
+    }
+   }
+  }
+ ],
+ "timepicker": {
+  "refresh_intervals": [
+   "5s",
+   "10s",
+   "30s",
+   "1m"
+  ]
+ }
+}

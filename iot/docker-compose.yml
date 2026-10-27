@@ -1,0 +1,17 @@
+# Nodo IoT (EC2 dedicada): un contenedor por camión frigorífico.
+# Uso:  docker compose up -d --build     ·  logs:  docker compose logs -f
+# Las credenciales de RDS se leen del archivo .env de esta carpeta.
+x-camion: &camion
+  build: .
+  image: cofrial-iot
+  restart: always
+  env_file: .env
+  logging: { driver: json-file, options: { max-size: "5m", max-file: "2" } }
+
+services:
+  cam01: { <<: *camion, container_name: cam01, environment: { CAMION_ID: CAM-01 } }
+  cam02: { <<: *camion, container_name: cam02, environment: { CAMION_ID: CAM-02 } }
+  cam03: { <<: *camion, container_name: cam03, environment: { CAMION_ID: CAM-03, FALLA_PROB: "0.05" } }
+  cam04: { <<: *camion, container_name: cam04, environment: { CAMION_ID: CAM-04 } }
+  cam05: { <<: *camion, container_name: cam05, environment: { CAMION_ID: CAM-05 } }
+  # Para sumar más camiones, copia una línea y cambia el nombre y CAMION_ID (CAM-06 ... CAM-10 ya existen en la BD).

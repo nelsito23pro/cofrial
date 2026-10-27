@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRM · Cofrial SpA</title>
+<link href="/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+<link href="/vendor/leaflet/leaflet.css" rel="stylesheet">
+<link href="/css/styles.css" rel="stylesheet">
+</head>
+<body>
+<!-- Login interno -->
+<div id="v-login" class="container py-5" style="max-width:420px; display:none">
+  <h2 class="fw-bold text-center mb-1">❄ COFRIAL CRM</h2>
+  <p class="text-center text-muted">Acceso para vendedores, despacho y gerencia</p>
+  <form id="f-login" class="card card-body border-0 shadow-sm">
+    <input class="form-control mb-2" name="email" type="email" placeholder="Email" value="vendedor@cofrial.cl" required>
+    <input class="form-control mb-3" name="password" type="password" placeholder="Contraseña" required>
+    <button class="btn btn-primary">Ingresar</button>
+    <p class="small text-muted mt-3 mb-0">Usuarios demo: vendedor@ · despacho@ · gerencia@ · admin@cofrial.cl — clave Cofrial2026!</p>
+  </form>
+  <div id="login-error" class="text-danger text-center mt-2"></div>
+</div>
+
+<!-- Aplicación -->
+<div id="v-app" class="container-fluid" style="display:none"><div class="row">
+  <nav class="col-md-2 crm-side p-3">
+    <div class="text-white fw-bold fs-5 mb-4">❄ COFRIAL CRM</div>
+    <div class="nav flex-column" id="menu">
+      <a class="nav-link active" data-v="panel">📊 Panel BI</a>
+      <a class="nav-link" data-v="clientes">👥 Clientes y prospectos</a>
+      <a class="nav-link" data-v="pipeline">🧭 Pipeline</a>
+      <a class="nav-link" data-v="pedidos">📦 Pedidos web</a>
+      <a class="nav-link" data-v="requerimientos">🤖 Requerimientos IA</a>
+      <a class="nav-link" data-v="flota">🚚 Flota y cadena de frío</a>
+    </div>
+    <div class="text-white-50 small mt-4" id="usuario"></div>
+    <a class="small text-white-50" href="#" id="salir">Cerrar sesión</a> · <a class="small text-white-50" href="/" target="_blank">Ver tienda</a>
+  </nav>
+  <main class="col-md-10 p-4">
+    <div id="aviso"></div>
+
+    <section id="s-panel">
+      <div class="d-flex justify-content-between align-items-center mb-3"><h3 class="fw-bold mb-0">Panel de Business Intelligence</h3>
+        <span class="small text-muted">Actualización automática cada 10 s · <span id="bi-hora"></span></span></div>
+      <div class="row g-3 mb-3" id="kpis"></div>
+      <div class="row g-3">
+        <div class="col-xl-8"><div class="card border-0 shadow-sm"><div class="card-body"><h6 class="fw-bold">Ventas diarias vs. alertas de ruptura de frío (14 días)</h6><canvas id="c-cruce" height="120"></canvas></div></div></div>
+        <div class="col-xl-4"><div class="card border-0 shadow-sm"><div class="card-body"><h6 class="fw-bold">Ventas por canal</h6><canvas id="c-canal" height="200"></canvas></div></div></div>
+        <div class="col-xl-4"><div class="card border-0 shadow-sm"><div class="card-body"><h6 class="fw-bold">B2B vs. B2C (ventas netas)</h6><canvas id="c-tipo" height="200"></canvas></div></div></div>
+        <div class="col-xl-4"><div class="card border-0 shadow-sm"><div class="card-body"><h6 class="fw-bold">Pipeline (monto por etapa)</h6><canvas id="c-pipe" height="200"></canvas></div></div></div>
+        <div class="col-xl-4"><div class="card border-0 shadow-sm"><div class="card-body"><h6 class="fw-bold">Alertas de frío por camión (24 h)</h6><canvas id="c-alertas" height="200"></canvas></div></div></div>
+      </div>
+    </section>
+
+    <section id="s-clientes" style="display:none">
+      <div class="d-flex justify-content-between align-items-center mb-3"><h3 class="fw-bold mb-0">Clientes y prospectos</h3>
+        <button class="btn btn-primary" id="btn-nuevo">+ Nuevo prospecto</button></div>
+      <div class="d-flex gap-2 mb-3">
+        <input id="c-q" class="form-control" placeholder="Buscar por nombre, email o RUT" style="max-width:320px">
+        <select id="c-tipo-f" class="form-select" style="max-width:150px"><option value="">Tipo</option><option>B2B</option><option>B2C</option></select>
+        <select id="c-estado-f" class="form-select" style="max-width:170px"><option value="">Estado</option><option>Prospecto</option><option>Activo</option><option>Inactivo</option></select>
+      </div>
+      <div class="card border-0 shadow-sm"><div class="table-responsive"><table class="table table-hover mb-0 align-middle">
+        <thead><tr><th>Cliente</th><th>Tipo</th><th>Estado</th><th>Lista</th><th>Vendedor</th><th class="text-end">Pedidos</th><th class="text-end">Compras netas</th><th></th></tr></thead>
+        <tbody id="t-clientes"></tbody></table></div></div>
+    </section>
+
+    <section id="s-pipeline" style="display:none">
+      <h3 class="fw-bold">Pipeline comercial</h3>
+      <p class="text-muted small">Arrastra las tarjetas entre columnas para avanzar la oportunidad. Monto ponderado: <b id="ponderado"></b></p>
+      <div class="row g-2" id="kanban"></div>
+    </section>
+
+    <section id="s-pedidos" style="display:none">
+      <div class="d-flex justify-content-between align-items-center mb-3"><h3 class="fw-bold mb-0">Pedidos</h3>
+        <select id="p-estado-f" class="form-select" style="max-width:200px"><option value="">Todos los estados</option></select></div>
+      <div class="card border-0 shadow-sm"><div class="table-responsive"><table class="table table-hover mb-0 align-middle small">
+        <thead><tr><th>N°</th><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Canal</th><th>Comuna</th><th class="text-end">Neto</th><th>Camión</th><th>Estado</th></tr></thead>
+        <tbody id="t-pedidos"></tbody></table></div></div>
+    </section>
+
+    <section id="s-requerimientos" style="display:none">
+      <h3 class="fw-bold">Requerimientos clasificados por IA</h3>
+      <p class="text-muted small">Mensajes del chat de la tienda. La IA asigna categoría y prioridad; las urgencias de cadena de frío aparecen primero.</p>
+      <div class="card border-0 shadow-sm"><div class="table-responsive"><table class="table mb-0 align-middle small">
+        <thead><tr><th>Fecha</th><th>Cliente</th><th>Categoría IA</th><th>Prioridad</th><th>Mensaje</th><th>Respuesta IA</th><th></th></tr></thead>
+        <tbody id="t-req"></tbody></table></div></div>
+    </section>
+
+    <section id="s-flota" style="display:none">
+      <div class="d-flex justify-content-between align-items-center mb-3"><h3 class="fw-bold mb-0">Flota y cadena de frío (IoT)</h3>
+        <span class="small text-muted">Telemetría en vivo · actualiza cada 5 s · <span id="flota-hora"></span></span></div>
+      <div class="row g-3">
+        <div class="col-xl-7"><div id="mapa"></div></div>
+        <div class="col-xl-5"><div class="card border-0 shadow-sm"><div class="card-body p-0"><div class="table-responsive" style="max-height:380px">
+          <table class="table table-sm mb-0 small align-middle"><thead><tr><th>Camión</th><th>Temp.</th><th>Rango</th><th>Comb.</th><th>Alertas 1 h</th><th>Última lectura</th></tr></thead>
+          <tbody id="t-flota"></tbody></table></div></div></div></div>
+        <div class="col-xl-7"><div class="card border-0 shadow-sm"><div class="card-body"><h6 class="fw-bold">Temperatura últimos 30 min · <select id="sel-camion" class="form-select form-select-sm d-inline-block w-auto"></select></h6><canvas id="c-temp" height="110"></canvas></div></div></div>
+        <div class="col-xl-5"><div class="card border-0 shadow-sm"><div class="card-body"><h6 class="fw-bold text-danger">Últimas alertas de ruptura de frío</h6><ul class="small mb-0" id="l-alertas" style="max-height:230px;overflow:auto"></ul></div></div></div>
+      </div>
+    </section>
+  </main>
+</div></div>
+
+<!-- Modales -->
+<div class="modal fade" id="m-ficha" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title" id="ficha-titulo"></h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body" id="ficha-cuerpo"></div></div></div></div>
+
+<div class="modal fade" id="m-nuevo" tabindex="-1"><div class="modal-dialog"><form class="modal-content" id="f-nuevo">
+  <div class="modal-header"><h5 class="modal-title">Nuevo prospecto</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body row g-2">
+    <div class="col-6"><select name="tipo" class="form-select"><option>B2B</option><option>B2C</option></select></div>
+    <div class="col-6"><input name="rut" class="form-control" placeholder="RUT"></div>
+    <div class="col-12"><input name="nombre" class="form-control" placeholder="Nombre / razón social" required></div>
+    <div class="col-6"><input name="email" type="email" class="form-control" placeholder="Email" required></div>
+    <div class="col-6"><input name="telefono" class="form-control" placeholder="Teléfono"></div>
+    <div class="col-8"><input name="titulo" class="form-control" placeholder="Oportunidad (ej.: Abastecimiento mensual)"></div>
+    <div class="col-4"><input name="monto_estimado" type="number" class="form-control" placeholder="Monto $"></div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-primary">Crear prospecto</button></div></form></div></div>
+
+<div class="modal fade" id="m-ruta" tabindex="-1"><div class="modal-dialog"><form class="modal-content" id="f-ruta">
+  <div class="modal-header"><h5 class="modal-title">Asignar despacho</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body"><p class="small text-muted">Al pasar a "En ruta" el pedido queda asociado al camión, cuya telemetría IoT se monitorea en vivo.</p>
+    <label class="form-label small fw-bold">Camión</label><select name="camion_id" id="ruta-camion" class="form-select mb-2"></select>
+    <label class="form-label small fw-bold">Conductor</label><select name="id_conductor" id="ruta-conductor" class="form-select"></select></div>
+  <div class="modal-footer"><button class="btn btn-primary">Despachar</button></div></form></div></div>
+
+<script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="/vendor/chart.js/chart.umd.js"></script>
+<script src="/vendor/leaflet/leaflet.js"></script>
+<script src="/js/common.js"></script>
+<script src="/js/crm.js"></script>
+</body>
+</html>

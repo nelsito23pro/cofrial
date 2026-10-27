@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carrito · Cofrial SpA</title>
+<link href="/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+<link href="/css/styles.css" rel="stylesheet">
+</head>
+<body>
+<div id="cabecera"></div>
+<main class="container pb-5">
+<div id="aviso"></div>
+<h2 class="fw-bold mb-3">Tu carrito</h2>
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm mb-4"><div class="table-responsive"><table class="table mb-0 align-middle">
+      <thead><tr><th>Producto</th><th style="width:120px">Cantidad</th><th>Precio unit.</th><th>Subtotal</th><th></th></tr></thead>
+      <tbody id="lineas"></tbody></table></div></div>
+    <div class="card border-0 shadow-sm" id="despacho"><div class="card-body">
+      <h5 class="fw-bold">Despacho</h5>
+      <div class="row g-2">
+        <div class="col-md-8"><label class="form-label small fw-bold">Dirección de entrega</label><select id="direccion" class="form-select"></select></div>
+        <div class="col-md-4 d-none" id="caja-oc"><label class="form-label small fw-bold">N° orden de compra (B2B)</label><input id="oc" class="form-control" placeholder="OC-2026-0001"></div>
+        <div class="col-12"><label class="form-label small fw-bold">Observaciones</label><input id="obs" class="form-control" maxlength="200" placeholder="Ej.: entregar en andén 2 antes de las 10:00"></div>
+      </div></div></div>
+  </div>
+  <div class="col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body">
+    <h5 class="fw-bold">Resumen</h5>
+    <div class="d-flex justify-content-between"><span>Subtotal neto</span><span id="neto">$0</span></div>
+    <div class="d-flex justify-content-between"><span>IVA 19%</span><span id="iva">$0</span></div>
+    <div class="d-flex justify-content-between"><span>Despacho refrigerado</span><span>$0</span></div><hr>
+    <div class="d-flex justify-content-between fs-5 fw-bold"><span>Total</span><span id="total">$0</span></div>
+    <p class="small text-muted mt-2" id="condicion"></p>
+    <button class="btn btn-primary w-100 mt-2" id="confirmar">Confirmar pedido</button>
+    <a href="/" class="btn btn-outline-secondary w-100 mt-2">Seguir comprando</a>
+  </div></div></div>
+</div>
+</main>
+<script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="/js/common.js"></script>
+<script>
+let PRECIOS = {};
+function pintar() {
+  const items = Carrito.leer();
+  let neto = 0;
+  document.getElementById("lineas").innerHTML = items.map((i, k) => {
+    const p = PRECIOS[i.id_producto] || 0, sub = p * i.cantidad; neto += sub;
+    return `<tr><td>${esc(i.nombre)}</td>
+      <td><input type="number" min="1" class="form-control form-control-sm" value="${i.cantidad}" onchange="cambiar(${k}, this.value)"></td>
+      <td>${CLP(p)} / ${esc(i.unidad)}</td><td class="fw-bold">${CLP(sub)}</td>
+      <td><button class="btn btn-sm btn-outline-danger" onclick="quitar(${k})">✕</button></td></tr>`;
+  }).join("") || `<tr><td colspan="5" class="text-muted p-4">El carrito está vacío. <a href="/">Ir al catálogo</a></td></tr>`;
+  document.getElementById("neto").textContent = CLP(neto);
+  document.getElementById("iva").textContent = CLP(neto * IVA);
+  document.getElementById("total").textContent = CLP(neto * (1 + IVA));
+}
+function cambiar(k, v) { const it = Carrito.leer(); it[k].cantidad = Math.max(1, Number(v) || 1); Carrito.guardar(it); pintar(); }
+function quitar(k) { const it = Carrito.leer(); it.splice(k, 1); Carrito.guardar(it); pintar(); }
+(async () => {
+  const s = await cabecera();
+  (await api("/api/productos")).forEach((p) => (PRECIOS[p.id_producto] = p.precio));
+  pintar();
+  const btn = document.getElementById("confirmar");
+  if (!s) {
+    document.getElementById("despacho").innerHTML = `<div class="card-body">Para despachar tu pedido <a href="/cuenta?volver=/carrito">inicia sesión o regístrate</a> (B2B o B2C).</div>`;
+    btn.disabled = true; return;
+  }
+  if (s.tipo === "B2B") {
+    document.getElementById("caja-oc").classList.remove("d-none");
+    document.getElementById("condicion").textContent = s.estado === "Activo" ? "Condición B2B: orden de compra y crédito a 30 días." : "Tu cuenta B2B está pendiente de aprobación por tu ejecutivo.";
+    if (s.estado !== "Activo") btn.disabled = true;
+  } else document.getElementById("condicion").textContent = "Pago simulado con tarjeta al confirmar (prototipo).";
+  const dirs = await api("/api/mis-direcciones");
+  document.getElementById("direccion").innerHTML = dirs.map((d) => `<option value="${d.id_direccion}">${esc(d.calle)} ${esc(d.numero || "")}, ${esc(d.comuna)}</option>`).join("");
+  btn.onclick = async () => {
+    btn.disabled = true;
+    try {
+      const r = await api("/api/pedidos", { method: "POST", body: { items: Carrito.leer(), id_direccion: document.getElementById("direccion").value,
+        orden_compra: document.getElementById("oc").value, observacion: document.getElementById("obs").value } });
+      Carrito.vaciar();
+      document.querySelector("main").innerHTML = `<div class="text-center py-5"><div style="font-size:4rem">✅</div>
+        <h2 class="fw-bold">Pedido N° ${r.id_pedido} recibido</h2><p>Total con IVA: <b>${CLP(r.total)}</b>. Ya está en el CRM de tu ejecutivo con estado <b>Pendiente</b>.</p>
+        <a class="btn btn-primary" href="/mis-pedidos">Ver mis pedidos</a></div>`;
+    } catch (e) { aviso(esc(e.message), "danger"); btn.disabled = false; }
+  };
+})();
+</script></body></html>

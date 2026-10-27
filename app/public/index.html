@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catálogo · Cofrial SpA</title>
+<link href="/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+<link href="/css/styles.css" rel="stylesheet">
+</head>
+<body>
+<div id="cabecera"></div>
+<main class="container pb-5">
+<div id="aviso"></div>
+<section class="hero p-4 p-md-5 mb-4">
+  <h1 class="fw-bold">Productos refrigerados y congelados</h1>
+  <p class="mb-0">Compra en línea con trazabilidad completa de la cadena de frío. Clientes institucionales: precios según su lista negociada.</p>
+</section>
+<div class="row g-4">
+  <aside class="col-lg-3">
+    <div class="card border-0 shadow-sm"><div class="card-body">
+      <input id="f-q" class="form-control mb-3" placeholder="Buscar producto o SKU">
+      <h6 class="fw-bold">Categoría</h6><select id="f-cat" class="form-select mb-3"><option value="">Todas</option></select>
+      <h6 class="fw-bold">Cadena de frío</h6>
+      <select id="f-temp" class="form-select"><option value="">Todas</option><option value="congelado">Congelado (≤ -18 °C)</option><option value="refrigerado">Refrigerado (0 a 5 °C)</option></select>
+    </div></div>
+    <p class="small text-muted mt-3" id="nota-precios"></p>
+  </aside>
+  <section class="col-lg-9"><div class="row g-3" id="grilla"></div></section>
+</div>
+</main>
+<script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="/js/common.js"></script>
+<script>
+const ICONOS = { "Vacuno": "🥩", "Aves": "🍗", "Cerdo": "🥓", "Pescados y mariscos": "🐟", "Lácteos": "🥛", "Congelados preparados": "🍔", "Insumos hospitalarios": "🏥" };
+async function cargar() {
+  const p = new URLSearchParams({ categoria: document.getElementById("f-cat").value, q: document.getElementById("f-q").value, temp: document.getElementById("f-temp").value });
+  const prods = await api("/api/productos?" + p);
+  document.getElementById("grilla").innerHTML = prods.map((x) => `
+    <div class="col-sm-6 col-xl-4"><div class="card card-prod h-100">
+      <div class="prod-icono ${x.temp_max < 0 ? "frio-cong" : "frio-ref"}">${ICONOS[x.categoria] || "📦"}</div>
+      <div class="card-body d-flex flex-column">
+        <div class="small text-muted">${esc(x.categoria)} · ${esc(x.sku)}</div>
+        <h6 class="fw-bold mb-1">${esc(x.nombre)}</h6>
+        <div class="mb-2"><span class="temp-chip">❄ ${x.temp_min} a ${x.temp_max} °C</span></div>
+        <div class="precio">${CLP(x.precio)} <span class="small fw-normal text-muted">/ ${esc(x.unidad)} + IVA</span></div>
+        <div class="small ${x.stock > 0 ? "text-success" : "text-danger"} mb-2">${x.stock > 0 ? "Stock: " + x.stock : "Sin stock"}</div>
+        <div class="input-group input-group-sm mt-auto">
+          <input type="number" class="form-control" min="1" value="1" id="q${x.id_producto}">
+          <button class="btn btn-primary" ${x.stock > 0 ? "" : "disabled"} onclick='agregar(${JSON.stringify({ id_producto: x.id_producto, nombre: x.nombre, unidad: x.unidad })})'>Agregar</button>
+        </div>
+      </div></div></div>`).join("") || `<p class="text-muted">No hay productos con esos filtros.</p>`;
+}
+function agregar(prod) {
+  const q = Math.max(1, Number(document.getElementById("q" + prod.id_producto).value) || 1);
+  Carrito.agregar(prod, q);
+  aviso(`Agregado: ${q} ${esc(prod.unidad)} de ${esc(prod.nombre)}. <a href="/carrito">Ver carrito</a>`);
+}
+(async () => {
+  const s = await cabecera();
+  document.getElementById("nota-precios").textContent = s ? `Estás viendo la lista de precios "${s.lista}".` : "Precios de lista pública. Inicia sesión como cliente B2B para ver tu lista institucional.";
+  (await api("/api/categorias")).forEach((c) => document.getElementById("f-cat").insertAdjacentHTML("beforeend", `<option value="${c.id_categoria}">${esc(c.nombre)}</option>`));
+  ["f-cat", "f-temp"].forEach((id) => (document.getElementById(id).onchange = cargar));
+  document.getElementById("f-q").oninput = () => { clearTimeout(window._t); window._t = setTimeout(cargar, 300); };
+  cargar();
+})();
+</script></body></html>

@@ -1,0 +1,29 @@
+# Nodo WEB (EC2 en subred pública): backend + tienda + CRM (puerto 80) y Grafana BI (puerto 3000)
+# Uso:  docker compose up -d --build      ·  estado: docker compose ps   ·  logs: docker compose logs -f app
+services:
+  app:
+    build: ./app
+    container_name: cofrial-app
+    restart: always            # se levanta solo cuando se reinicia la EC2 / el laboratorio
+    env_file: .env
+    ports: ["80:80"]
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
+  grafana:
+    image: grafana/grafana-oss:11.4.0
+    container_name: cofrial-grafana
+    restart: always
+    env_file: .env             # DB_HOST, DB_USER, DB_PASS se usan en el datasource aprovisionado
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASS:-Cofrial2026!}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"        # el dashboard se puede ver sin login (modo demo)
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/cofrial.json
+      GF_DATE_FORMATS_DEFAULT_TIMEZONE: browser
+    ports: ["3000:3000"]
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+volumes:
+  grafana-data:

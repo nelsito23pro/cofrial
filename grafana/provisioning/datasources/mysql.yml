@@ -1,0 +1,15 @@
+apiVersion: 1
+datasources:
+  - name: Cofrial RDS
+    uid: cofrial-mysql
+    type: mysql
+    url: ${DB_HOST}:${DB_PORT}
+    user: ${DB_USER}
+    database: ${DB_NAME}
+    isDefault: true
+    jsonData:
+      database: ${DB_NAME}
+      timezone: "${DB_TIMEZONE}"
+      maxOpenConns: 10
+    secureJsonData:
+      password: ${DB_PASS}
