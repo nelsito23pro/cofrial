@@ -666,8 +666,9 @@
      "showZoom": true
     },
     "basemap": {
-     "type": "default",
-     "name": "Mapa base"
+     "type": "osm-standard",
+     "name": "OpenStreetMap",
+     "config": {}
     },
     "layers": [
      {
