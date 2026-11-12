@@ -221,7 +221,7 @@ Si la API falla o llega al límite gratuito, el sistema usa automáticamente el 
    - En **Pedidos web**, el pedido recién creado aparece *Pendiente*. Pásalo a *En ruta*, asígnale el camión `CAM-03` y luego márcalo *Entregado*.
    - En la tienda, el cliente ve el estado en **Mis pedidos**.
 5. **Registro B2B y pipeline.**
-   - Registra una empresa nueva en `/cuenta` (perfil B2B). Queda *pendiente*.
+   - Registra una empresa nueva en `/registro` (perfil B2B). Queda *pendiente*.
    - En el CRM aparece como prospecto y en el pipeline. Apruébala desde su ficha, asignándole una lista de precios.
    - Cuando la empresa compre, la oportunidad pasa sola a *Ganada*.
 6. **IoT.** En **Flota y cadena de frío**, muestra el mapa, las temperaturas y las alertas en vivo. En la EC2 IoT, ejecuta `docker compose ps` y `docker compose logs --tail 5`.

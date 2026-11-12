@@ -37,7 +37,7 @@ async function cabecera(activa) {
        <a class="nav-link d-inline text-white ${activa === "pedidos" ? "fw-bold" : ""}" href="/mis-pedidos">Mis pedidos</a>
        <a class="nav-link d-inline text-white ${activa === "casos" ? "fw-bold" : ""}" href="/mis-casos">Mis casos</a>
        <a class="nav-link d-inline text-white-50" href="#" id="salir">Salir</a>`
-    : `<a class="btn btn-sm btn-light" href="/cuenta">Ingresar / Registrarse</a>`;
+    : `<a class="btn btn-sm btn-light" href="/cuenta">Ingresar</a> <a class="btn btn-sm btn-outline-light" href="/registro">Crear cuenta</a>`;
   document.getElementById("cabecera").innerHTML = `
   <nav class="navbar navbar-dark navbar-cof mb-4"><div class="container">
     <a class="navbar-brand" href="/">❄ COFRIAL</a>
