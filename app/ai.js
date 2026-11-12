@@ -12,6 +12,8 @@ Clasifica el mensaje del cliente y responde SOLO con JSON válido, sin texto adi
 Reglas: si menciona producto descongelado, blando, tibio, mal olor o temperatura, la categoría es "Urgencia cadena de frío" con prioridad 1.
 Si menciona un producto en mal estado, vencido, podrido, contaminado o con hongos, la categoría es "Reclamo" con prioridad 1 (inocuidad alimentaria): pide no consumirlo.
 Otros reclamos (faltantes, atrasos, errores) son "Reclamo" con prioridad 2.
+Si quiere comprar, cotizar o pide cantidades (kg, cajas, unidades) es "Pedido" con prioridad 2: es una oportunidad de venta para su ejecutivo.
+Las preguntas generales (horarios, cobertura, despachos, formas de pago) son "Consulta" con prioridad 3.
 Mensaje del cliente: """${mensaje}"""`;
 
 
