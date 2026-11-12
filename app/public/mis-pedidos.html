@@ -17,6 +17,9 @@
 <script src="/js/common.js"></script>
 <script>
 const COLOR = { "Pendiente": "secondary", "Confirmado": "info", "En preparación": "warning", "En ruta": "primary", "Entregado": "success", "Cancelado": "danger" };
+const COLOR_PAGO = { "Aprobado": "success", "Pendiente": "warning text-dark", "Rechazado": "danger", "Anulado": "secondary" };
+const pago = (p) => p.pago_estado
+  ? `<span class="badge bg-${COLOR_PAGO[p.pago_estado]}">💳 Pago ${esc(p.pago_estado.toLowerCase())}${p.pago_tarjeta ? " · **** " + esc(p.pago_tarjeta) : ""}</span>` : "";
 (async () => {
   const s = await cabecera("pedidos");
   if (!s) { location.href = "/cuenta?volver=/mis-pedidos"; return; }
@@ -25,7 +28,7 @@ const COLOR = { "Pendiente": "secondary", "Confirmado": "info", "En preparación
     <div class="card border-0 shadow-sm mb-3"><div class="card-body">
       <div class="d-flex justify-content-between flex-wrap gap-2">
         <div><b>Pedido N° ${p.id_pedido}</b> <span class="text-muted small">· ${esc(p.fecha_pedido)} · canal ${esc(p.canal)}</span></div>
-        <div><span class="badge bg-${COLOR[p.estado] || "secondary"}">${esc(p.estado)}</span> ${p.camion_id ? `<span class="badge bg-light text-dark">🚚 ${esc(p.camion_id)}</span>` : ""}</div>
+        <div>${pago(p)} <span class="badge bg-${COLOR[p.estado] || "secondary"}">${esc(p.estado)}</span> ${p.camion_id ? `<span class="badge bg-light text-dark">🚚 ${esc(p.camion_id)}</span>` : ""}</div>
       </div>
       <ul class="small mt-2 mb-2">${p.items.map((i) => `<li>${i.cantidad} ${esc(i.unidad)} · ${esc(i.nombre)} (${CLP(i.precio_unitario)})</li>`).join("")}</ul>
       <div class="d-flex justify-content-between"><span class="small text-muted">${esc(p.observacion || "")}</span><b>Total ${CLP(p.total_con_iva)}</b></div>

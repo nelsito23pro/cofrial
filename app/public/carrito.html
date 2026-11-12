@@ -69,14 +69,32 @@ function quitar(k) { const it = Carrito.leer(); it.splice(k, 1); Carrito.guardar
     document.getElementById("caja-oc").classList.remove("d-none");
     document.getElementById("condicion").textContent = s.estado === "Activo" ? "Condición B2B: orden de compra y crédito a 30 días." : "Tu cuenta B2B está pendiente de aprobación por tu ejecutivo.";
     if (s.estado !== "Activo") btn.disabled = true;
-  } else document.getElementById("condicion").textContent = "Pago simulado con tarjeta al confirmar (prototipo).";
+  } else {
+    document.getElementById("condicion").innerHTML = "Pago seguro con <b>Webpay Plus</b> (Transbank): débito, crédito o prepago.";
+    btn.textContent = "Pagar con Webpay";
+  }
   const dirs = await api("/api/mis-direcciones");
   document.getElementById("direccion").innerHTML = dirs.map((d) => `<option value="${d.id_direccion}">${esc(d.calle)} ${esc(d.numero || "")}, ${esc(d.comuna)}</option>`).join("");
+  const datos = () => ({ items: Carrito.leer(), id_direccion: document.getElementById("direccion").value,
+    orden_compra: document.getElementById("oc").value, observacion: document.getElementById("obs").value });
+  if (s.tipo !== "B2B") {   // B2C: el pedido se crea y el navegador pasa al formulario oficial de Webpay
+    btn.onclick = async () => {
+      btn.disabled = true;
+      try {
+        const r = await api("/api/pagos/webpay/iniciar", { method: "POST", body: datos() });
+        const f = document.createElement("form");
+        f.method = "POST"; f.action = r.url;
+        f.innerHTML = `<input type="hidden" name="token_ws" value="${esc(r.token)}">`;
+        document.body.appendChild(f);
+        f.submit();
+      } catch (e) { aviso(esc(e.message), "danger"); btn.disabled = false; }
+    };
+    return;
+  }
   btn.onclick = async () => {
     btn.disabled = true;
     try {
-      const r = await api("/api/pedidos", { method: "POST", body: { items: Carrito.leer(), id_direccion: document.getElementById("direccion").value,
-        orden_compra: document.getElementById("oc").value, observacion: document.getElementById("obs").value } });
+      const r = await api("/api/pedidos", { method: "POST", body: datos() });
       Carrito.vaciar();
       document.querySelector("main").innerHTML = `<div class="text-center py-5"><div style="font-size:4rem">✅</div>
         <h2 class="fw-bold">Pedido N° ${r.id_pedido} recibido</h2><p>Total con IVA: <b>${CLP(r.total)}</b>. Ya está en el CRM de tu ejecutivo con estado <b>Pendiente</b>.</p>

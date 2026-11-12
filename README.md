@@ -2,7 +2,7 @@
 
 Prototipo funcional del ecosistema diseñado en el Hito 1. Incluye:
 
-- **E-commerce B2B/B2C:** catálogo de productos refrigerados con listas de precios por perfil, carrito de compras, checkout (orden de compra y crédito para B2B) y generación de órdenes.
+- **E-commerce B2B/B2C:** catálogo de productos refrigerados con listas de precios por perfil, carrito de compras, checkout (orden de compra y crédito para B2B, pago con **Webpay Plus** para B2C) y generación de órdenes.
 - **CRM operativo:** clientes y prospectos, aprobación de cuentas B2B, pipeline Kanban, pedidos web con despacho y requerimientos.
 - **IA de costo cero:** chat que clasifica requerimientos y les asigna prioridad. Funciona con Groq o Gemini (capas gratuitas) y tiene un clasificador local de respaldo.
 - **Simulación IoT:** contenedores Docker (uno por camión) en una EC2 dedicada. Cada contenedor inserta cada 5 s en RDS `camion_id`, `temp_camara`, `lat`, `lon`, `combustible_pct` y `alerta_ruptura_frio`.
@@ -22,10 +22,10 @@ EC2 IoT (subred pública 10.0.2.0/24) ─ contenedores cam01 … cam05 (simulado
 
 | Carpeta / archivo | Contenido |
 | --- | --- |
-| `db/01_schema.sql` | Esquema MySQL 8 en 3FN (29 tablas), igual al MER del Hito 1 |
+| `db/01_schema.sql` | Esquema MySQL 8 en 3FN (30 tablas): el MER del Hito 1 más la tabla `pago` de la pasarela Webpay |
 | `db/02_seed.sql` | Datos de demostración: productos, listas de precios, clientes, 40 pedidos, 10 camiones y 14 días de telemetría (se regenera con `gen_seed.py`) |
 | `db/03_views.sql` | Vistas para el BI: totales de pedido, ventas diarias, alertas diarias, cruce ventas vs. alertas y última lectura de cada camión |
-| `app/` | Backend Node.js + Express, páginas de la tienda y del CRM, integración con IA (`ai.js`) |
+| `app/` | Backend Node.js + Express, páginas de la tienda y del CRM, integración con IA (`ai.js`) y pasarela Webpay Plus (`routes/pagos.js`) |
 | `iot/` | Simulador Python, Dockerfile y `docker-compose.yml` del nodo IoT |
 | `grafana/` | Datasource y dashboard aprovisionados automáticamente |
 | `docker-compose.yml` | Nodo Web: contenedores `app` y `grafana` |
@@ -40,6 +40,16 @@ EC2 IoT (subred pública 10.0.2.0/24) ─ contenedores cam01 … cam05 (simulado
 | CRM, vendedora | vendedor@cofrial.cl | Cofrial2026! |
 | CRM, despacho / gerencia / admin | despacho@ · gerencia@ · admin@cofrial.cl | Cofrial2026! |
 | Grafana | admin | valor de `GRAFANA_ADMIN_PASS` (por defecto Cofrial2026!) |
+
+### Tarjetas de prueba de Webpay (ambiente de integración, sin dinero real)
+
+| Tarjeta | Número | CVV | Vencimiento | Resultado |
+| --- | --- | --- | --- | --- |
+| VISA crédito | 4051 8856 0044 6623 | 123 | cualquier fecha futura | Aprobada |
+| Redcompra débito | 4051 8842 3993 7763 | — | — | Aprobada |
+| Mastercard crédito | 5186 0595 5959 0568 | 123 | cualquier fecha futura | Rechazada |
+
+Cuando Webpay pida autenticación, usa RUT **11.111.111-1** y clave **123**.
 
 ---
 
@@ -150,10 +160,10 @@ Si usaste el *User data*, revisa que Docker esté listo con `docker compose vers
 ```bash
 cp .env.example .env
 nano .env                  # DB_HOST = endpoint de RDS, DB_PASS = clave maestra, SESSION_SECRET = texto aleatorio
-bash scripts/cargar-bd.sh  # crea cofrial_db con 29 tablas, datos demo y vistas
+bash scripts/cargar-bd.sh  # crea cofrial_db con 30 tablas, datos demo y vistas
 ```
 
-Si el script responde con 29 tablas, 14 productos, 9 clientes, 40 pedidos y 10 camiones, la conexión EC2 → RDS funciona y la seguridad está bien configurada.
+Si el script responde con 30 tablas, 14 productos, 9 clientes, 40 pedidos y 10 camiones, la conexión EC2 → RDS funciona y la seguridad está bien configurada.
 
 ### Paso 8. Levantar la tienda, el CRM y Grafana (en la EC2 Web)
 
@@ -203,7 +213,7 @@ Si la API falla o llega al límite gratuito, el sistema usa automáticamente el 
 ## Guion sugerido para la defensa (≈ 7 minutos, sigue la rúbrica)
 
 1. **Despliegue cloud.** Muestra en la consola AWS la VPC, las dos EC2 *running*, RDS *Available* con *Public access: No* y las reglas de `sg-rds`. Ejecuta `bash scripts/verificar.sh`.
-2. **E-commerce B2C.** Sin sesión, navega el catálogo. Luego ingresa como `camila.rojas@mail.cl` y muestra el precio público.
+2. **E-commerce B2C.** Sin sesión, navega el catálogo. Luego ingresa como `camila.rojas@mail.cl`, muestra el precio público, agrega productos y presiona **Pagar con Webpay**. Paga con la VISA de prueba: el pedido vuelve *Confirmado* y en el CRM aparece con el pago *Aprobado* y la tarjeta `**** 6623`.
 3. **E-commerce B2B.** Cierra sesión e ingresa como `compras@hospitalaraucania.cl`. El precio cambia a la lista Institucional Salud. Agrega productos, pon una orden de compra y confirma el pedido.
 4. **CRM.**
    - Entra en otra pestaña a `/crm` como vendedora.

@@ -24,6 +24,7 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
+app.use("/api/pagos", require("./routes/pagos"));
 app.use("/api", require("./routes/tienda"));
 app.use("/api/crm", require("./routes/crm"));
 // Librerías front-end servidas localmente (la demo no depende de CDNs externos)

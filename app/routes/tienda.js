@@ -3,11 +3,10 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const { query, transaction } = require("../db");
 const { clasificar } = require("../ai");
+const { crearPedido, fail, BODEGA_DESPACHO } = require("../pedidos");
 const router = express.Router();
 
-const BODEGA_DESPACHO = 1;   // Centro de frío Temuco
 const LISTA_GENERAL = 1;     // General B2C
-const IVA = 0.19;
 
 const soloCliente = (req, res, next) => (req.session.cliente ? next() : res.status(401).json({ error: "Debes iniciar sesión" }));
 const ok = (fn) => (req, res) => fn(req, res).catch((e) => { console.error(e); res.status(500).json({ error: e.message }); });
@@ -106,49 +105,21 @@ router.post("/mis-direcciones", soloCliente, ok(async (req, res) => {
   res.json({ id_direccion: r.insertId });
 }));
 
-// Crea la orden: valida stock, aplica la lista de precios del cliente, descuenta inventario
-// y, si es B2B con una oportunidad abierta en el CRM, la marca como Ganada y la vincula al pedido.
+// Compra B2B con orden de compra y crédito a 30 días. Los clientes B2C pagan con Webpay (routes/pagos.js).
 router.post("/pedidos", soloCliente, ok(async (req, res) => {
-  const idCliente = req.session.cliente.id_cliente;
-  const items = (req.body.items || []).map((i) => ({ id: Number(i.id_producto), cant: Number(i.cantidad) })).filter((i) => i.id && i.cant > 0);
-  if (!items.length) return res.status(400).json({ error: "El carrito está vacío" });
-
   const resultado = await transaction(async (cn) => {
-    const [[cli]] = await cn.query(`SELECT c.id_cliente, c.id_lista, c.id_tipo, c.id_vendedor, ec.nombre AS estado
-      FROM cliente c JOIN estado_cliente ec ON ec.id_estado_cliente=c.id_estado_cliente WHERE c.id_cliente=?`, [idCliente]);
-    if (cli.id_tipo === 1 && cli.estado !== "Activo")
-      throw Object.assign(new Error("Tu cuenta B2B está pendiente de aprobación por tu ejecutivo comercial"), { status: 403 });
-    const [[dir]] = await cn.query("SELECT id_direccion FROM direccion WHERE id_direccion=? AND id_cliente=?", [req.body.id_direccion, idCliente]);
-    if (!dir) throw Object.assign(new Error("Selecciona una dirección de despacho válida"), { status: 400 });
-
-    const lineas = [];
-    for (const it of items) {
-      const [[p]] = await cn.query(`SELECT p.nombre, pp.precio, i.stock_actual FROM producto p
-        JOIN precio_producto pp ON pp.id_producto=p.id_producto AND pp.id_lista=?
-        JOIN inventario i ON i.id_producto=p.id_producto AND i.id_bodega=? WHERE p.id_producto=? FOR UPDATE`, [cli.id_lista, BODEGA_DESPACHO, it.id]);
-      if (!p) throw Object.assign(new Error(`Producto ${it.id} no disponible`), { status: 400 });
-      if (p.stock_actual < it.cant) throw Object.assign(new Error(`Stock insuficiente de ${p.nombre} (disponible: ${p.stock_actual})`), { status: 409 });
-      lineas.push({ ...it, precio: p.precio });
-    }
-    const obs = [req.body.orden_compra ? `OC ${req.body.orden_compra}` : null, req.body.observacion || null].filter(Boolean).join(" · ") || null;
-    const [r] = await cn.query("INSERT INTO pedido (id_cliente,id_direccion,id_canal,id_estado_pedido,observacion) VALUES (?,?,1,1,?)",
-      [idCliente, dir.id_direccion, obs]);
-    const idPedido = r.insertId;
-    for (const l of lineas) {
-      await cn.query("INSERT INTO detalle_pedido (id_pedido,id_producto,cantidad,precio_unitario) VALUES (?,?,?,?)", [idPedido, l.id, l.cant, l.precio]);
-      await cn.query("UPDATE inventario SET stock_actual=stock_actual-? WHERE id_bodega=? AND id_producto=?", [l.cant, BODEGA_DESPACHO, l.id]);
-    }
-    await cn.query(`UPDATE oportunidad SET id_etapa=5, id_pedido=?, fecha_cierre=NOW()
-      WHERE id_cliente=? AND id_etapa NOT IN (5,6) AND id_pedido IS NULL ORDER BY fecha_apertura LIMIT 1`, [idPedido, idCliente]);
-    const neto = lineas.reduce((s, l) => s + l.cant * l.precio, 0);
-    return { id_pedido: idPedido, neto, iva: Math.round(neto * IVA), total: Math.round(neto * (1 + IVA)) };
+    const [[cli]] = await cn.query("SELECT id_tipo FROM cliente WHERE id_cliente=?", [req.session.cliente.id_cliente]);
+    if (cli.id_tipo !== 1) throw fail(400, "Los clientes B2C pagan su pedido con Webpay");
+    return crearPedido(cn, req.session.cliente.id_cliente, req.body);
   }).catch((e) => { if (e.status) { res.status(e.status).json({ error: e.message }); return null; } throw e; });
   if (resultado) res.json(resultado);
 }));
 
 router.get("/mis-pedidos", soloCliente, ok(async (req, res) => {
   const pedidos = await query(`SELECT v.id_pedido, v.fecha_pedido, v.estado, v.canal, v.total_neto, v.total_con_iva, p.observacion,
-      (SELECT d.camion_id FROM despacho_pedido dp JOIN despacho d ON d.id_despacho=dp.id_despacho WHERE dp.id_pedido=v.id_pedido ORDER BY d.id_despacho DESC LIMIT 1) AS camion_id
+      (SELECT d.camion_id FROM despacho_pedido dp JOIN despacho d ON d.id_despacho=dp.id_despacho WHERE dp.id_pedido=v.id_pedido ORDER BY d.id_despacho DESC LIMIT 1) AS camion_id,
+      (SELECT pg.estado FROM pago pg WHERE pg.id_pedido=v.id_pedido ORDER BY pg.id_pago DESC LIMIT 1) AS pago_estado,
+      (SELECT pg.tarjeta_ultimos4 FROM pago pg WHERE pg.id_pedido=v.id_pedido ORDER BY pg.id_pago DESC LIMIT 1) AS pago_tarjeta
     FROM v_pedido_total v JOIN pedido p ON p.id_pedido=v.id_pedido WHERE v.id_cliente=? ORDER BY v.fecha_pedido DESC`, [req.session.cliente.id_cliente]);
   const detalle = pedidos.length ? await query(`SELECT d.id_pedido, pr.nombre, d.cantidad, pr.unidad, d.precio_unitario FROM detalle_pedido d
     JOIN producto pr ON pr.id_producto=d.id_producto WHERE d.id_pedido IN (?)`, [pedidos.map((p) => p.id_pedido)]) : [];

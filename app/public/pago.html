@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resultado del pago · Cofrial SpA</title>
+<link href="/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+<link href="/css/styles.css" rel="stylesheet">
+</head>
+<body>
+<div id="cabecera"></div>
+<main class="container pb-5">
+<div id="aviso"></div>
+<div id="resultado" class="text-center py-5 text-muted">Consultando el resultado del pago...</div>
+</main>
+<script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="/js/common.js"></script>
+<script>
+const TIPO_PAGO = { VD: "Débito (Redcompra)", VP: "Prepago", VN: "Crédito sin cuotas", VC: "Crédito en cuotas", SI: "3 cuotas sin interés", S2: "2 cuotas sin interés", NC: "Cuotas sin interés" };
+const fila = (k, v) => `<tr><th class="text-start fw-normal text-muted">${k}</th><td class="text-end fw-bold">${v}</td></tr>`;
+(async () => {
+  const s = await cabecera();
+  const id = new URLSearchParams(location.search).get("pedido");
+  const el = document.getElementById("resultado");
+  if (!s || !id) {
+    el.innerHTML = `<h2 class="fw-bold">No encontramos el pago</h2><p>Revisa el estado en <a href="/mis-pedidos">Mis pedidos</a>.</p>`;
+    return;
+  }
+  try {
+    const p = await api("/api/pagos/pedido/" + encodeURIComponent(id));
+    const aprobado = p.pago_estado === "Aprobado";
+    if (aprobado) Carrito.vaciar();   // si el pago falla, el carrito se conserva para reintentar
+    const titulo = { Aprobado: ["✅", "Pago aprobado"], Rechazado: ["❌", "Pago rechazado"], Anulado: ["↩️", "Pago anulado"], Pendiente: ["⏳", "Pago en proceso"] }[p.pago_estado] || ["ℹ️", "Pedido sin pago"];
+    el.className = "py-5";
+    el.innerHTML = `<div class="text-center"><div style="font-size:4rem">${titulo[0]}</div><h2 class="fw-bold">${titulo[1]}</h2>
+      <p class="text-muted">${aprobado ? "Tu pedido ya está en el CRM de Cofrial y será despachado en camión refrigerado."
+        : p.pago_estado === "Pendiente" ? "Aún no recibimos la respuesta de Webpay. Revisa el estado en unos minutos en Mis pedidos."
+        : "No se realizó ningún cargo. El pedido se canceló y puedes volver a intentarlo desde tu carrito."}</p></div>
+      <div class="card border-0 shadow-sm mx-auto" style="max-width:460px"><div class="card-body"><table class="table table-sm mb-0">
+        ${fila("Pedido", "N° " + p.id_pedido)}
+        ${fila("Monto", CLP(p.monto ?? p.total_con_iva))}
+        ${p.orden_compra ? fila("Orden de compra", esc(p.orden_compra)) : ""}
+        ${p.codigo_autorizacion ? fila("Código de autorización", esc(p.codigo_autorizacion)) : ""}
+        ${p.tarjeta_ultimos4 ? fila("Tarjeta", "**** **** **** " + esc(p.tarjeta_ultimos4)) : ""}
+        ${p.tipo_pago ? fila("Tipo de pago", esc(TIPO_PAGO[p.tipo_pago] || p.tipo_pago) + (p.cuotas > 1 ? ` · ${p.cuotas} cuotas` : "")) : ""}
+        ${p.fecha_respuesta ? fila("Fecha", esc(p.fecha_respuesta)) : ""}
+        ${fila("Estado del pedido", esc(p.estado))}
+      </table></div></div>
+      <div class="text-center mt-4 d-flex gap-2 justify-content-center">
+        ${aprobado ? `<a class="btn btn-primary" href="/mis-pedidos">Ver mis pedidos</a>` : `<a class="btn btn-primary" href="/carrito">Volver al carrito</a>`}
+        <a class="btn btn-outline-secondary" href="/">Seguir comprando</a></div>`;
+  } catch (e) {
+    el.innerHTML = `<h2 class="fw-bold">No pudimos consultar el pago</h2><p>${esc(e.message)}</p><a href="/mis-pedidos">Ir a Mis pedidos</a>`;
+  }
+})();
+</script></body></html>

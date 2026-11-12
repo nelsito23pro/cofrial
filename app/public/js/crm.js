@@ -134,12 +134,18 @@ async function soltar(ev, etapa) {
 
 // ---------- Pedidos ----------
 let PEDIDO_RUTA = null;
+const COLOR_PAGO = { "Aprobado": "success", "Pendiente": "warning text-dark", "Rechazado": "danger", "Anulado": "secondary" };
+// B2C: estado del pago Webpay (con tarjeta y autorización). B2B: orden de compra / crédito, sin pasarela.
+const pagoCRM = (p) => p.pago_estado
+  ? `<span class="badge bg-${COLOR_PAGO[p.pago_estado]}" title="${p.pago_autorizacion ? "Autorización " + esc(p.pago_autorizacion) : ""}">${esc(p.pago_estado)}</span>`
+    + (p.pago_tarjeta ? `<div class="text-muted">Webpay **** ${esc(p.pago_tarjeta)}</div>` : "")
+  : `<span class="text-muted">${p.tipo_cliente === "B2B" ? "Crédito B2B" : "—"}</span>`;
 async function cargarPedidos() {
   const est = $("p-estado-f").value;
   const rows = await api("/api/crm/pedidos" + (est ? "?estado=" + encodeURIComponent(est) : ""));
   $("t-pedidos").innerHTML = rows.map((p) => `<tr>
     <td><b>${p.id_pedido}</b></td><td>${esc(p.fecha_pedido.slice(0, 16))}</td><td>${esc(p.cliente)}<div class="text-muted">${esc(p.observacion || "")}</div></td>
-    <td>${p.tipo_cliente}</td><td>${esc(p.canal)}</td><td>${esc(p.comuna)}</td><td class="text-end">${CLP(p.total_neto)}</td><td>${p.camion_id ? "🚚 " + p.camion_id : "—"}</td>
+    <td>${p.tipo_cliente}</td><td>${esc(p.canal)}</td><td>${esc(p.comuna)}</td><td class="text-end">${CLP(p.total_neto)}</td><td>${pagoCRM(p)}</td><td>${p.camion_id ? "🚚 " + p.camion_id : "—"}</td>
     <td><select class="form-select form-select-sm border-${COLOR_ESTADO[p.estado]}" onchange="cambiarEstado(${p.id_pedido}, this.value, this)">
       ${CAT.estados.map((e) => `<option value="${e.id}" ${e.nombre === p.estado ? "selected" : ""}>${esc(e.nombre)}</option>`).join("")}</select></td></tr>`).join("");
 }

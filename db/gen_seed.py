@@ -11,7 +11,7 @@ w = out.append
 q = lambda s: "NULL" if s is None else "'" + str(s).replace("'", "''") + "'"
 
 w("SET NAMES utf8mb4;\nSET time_zone = '-03:00';  -- hora de Chile, igual que el backend\nUSE cofrial_db;\nSET FOREIGN_KEY_CHECKS = 0;")
-for t in ["telemetria", "despacho_pedido", "despacho", "conductor", "camion", "requerimiento", "categoria_requerimiento",
+for t in ["pago", "telemetria", "despacho_pedido", "despacho", "conductor", "camion", "requerimiento", "categoria_requerimiento",
           "interaccion", "tipo_interaccion", "oportunidad", "etapa_pipeline", "detalle_pedido", "pedido", "estado_pedido", "canal",
           "inventario", "bodega", "precio_producto", "producto", "categoria", "direccion", "cliente", "lista_precio",
           "estado_cliente", "tipo_cliente", "comuna", "region", "usuario", "rol"]:
@@ -83,7 +83,7 @@ w("INSERT INTO direccion (id_direccion,id_cliente,id_comuna,calle,numero,referen
 # ---------- pedidos históricos (últimos 14 días) ----------
 activos = [i + 1 for i, c in enumerate(clientes) if c[1] == 2]
 lista_de = {i + 1: c[2] for i, c in enumerate(clientes)}
-peds, dets = [], []
+peds, dets, pagos = [], [], []
 for pid in range(1, 41):
     cli = random.choice(activos)
     horas = random.randint(2, 14 * 24)
@@ -91,12 +91,21 @@ for pid in range(1, 41):
     estado = 5 if horas > 48 else random.choice([1, 2, 3, 4])
     if random.random() < 0.05: estado = 6
     peds.append(f"({pid},{cli},{cli},{canal},{estado},DATE_SUB(NOW(), INTERVAL {horas} HOUR),NULL)")
+    neto = 0
     for prod in random.sample(range(1, len(prods) + 1), random.randint(1, 4)):
         cant = random.randint(1, 4) if clientes[cli - 1][0] == 2 else random.randint(10, 60)
         precio = round(prods[prod - 1][5] * factor[lista_de[cli]] / 10) * 10
         dets.append(f"({pid},{prod},{cant},{precio})")
+        neto += cant * precio
+    if clientes[cli - 1][0] == 2:  # los B2C pagan con Webpay Plus (sin usar random: no altera el resto de los datos)
+        ok = estado != 6
+        fecha = f"DATE_SUB(NOW(), INTERVAL {horas} HOUR)"
+        pagos.append(f"({pid},{q('Aprobado' if ok else 'Rechazado')},{round(neto * 1.19)},{q(f'P{pid}-SEED')},"
+                     f"{q(f'{1213 + pid * 37:06d}') if ok else 'NULL'},{q('VD' if pid % 3 else 'VN')},0,{q(['6623', '7763'][pid % 2])},{fecha},{fecha})")
 w("INSERT INTO pedido (id_pedido,id_cliente,id_direccion,id_canal,id_estado_pedido,fecha_pedido,observacion) VALUES " + ",".join(peds) + ";")
 w("INSERT INTO detalle_pedido (id_pedido,id_producto,cantidad,precio_unitario) VALUES " + ",".join(dets) + ";")
+w("INSERT INTO pago (id_pedido,estado,monto,orden_compra,codigo_autorizacion,tipo_pago,cuotas,tarjeta_ultimos4,fecha_creacion,fecha_respuesta) VALUES "
+  + ",".join(pagos) + ";")
 
 # ---------- CRM ----------
 w("INSERT INTO oportunidad (id_cliente,id_usuario,id_etapa,id_pedido,titulo,monto_estimado,fecha_apertura,fecha_cierre) VALUES "

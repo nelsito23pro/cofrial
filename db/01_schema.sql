@@ -2,7 +2,7 @@ SET NAMES utf8mb4;
 -- =====================================================================
 -- Cofrial SpA · Base de datos cofrial_db (MySQL 8 / Amazon RDS)
 -- Modelo en 3FN: Seguridad, Geografía, Comercial, Catálogo/Inventario,
--- E-commerce, CRM, Logística e IoT  (29 tablas)
+-- E-commerce, CRM, Logística e IoT  (30 tablas)
 -- =====================================================================
 -- ATENCIÓN: este script recrea la base desde cero (borra los datos existentes).
 DROP DATABASE IF EXISTS cofrial_db;
@@ -285,6 +285,27 @@ CREATE TABLE telemetria (
   CONSTRAINT ck_tel_combustible CHECK (combustible_pct BETWEEN 0 AND 100),
   INDEX ix_tel_camion_fecha (camion_id, fecha_hora),
   INDEX ix_tel_fecha (fecha_hora)
+) ENGINE=InnoDB;
+
+-- ---------- Pagos (pasarela Webpay Plus, clientes B2C) ----------
+-- Un pedido puede tener varios intentos de pago; solo se guardan los 4 últimos dígitos de la tarjeta.
+CREATE TABLE pago (
+  id_pago INT AUTO_INCREMENT PRIMARY KEY,
+  id_pedido INT NOT NULL,
+  metodo VARCHAR(30) NOT NULL DEFAULT 'Webpay Plus',
+  estado VARCHAR(20) NOT NULL DEFAULT 'Pendiente',   -- Pendiente · Aprobado · Rechazado · Anulado
+  monto INT NOT NULL,                                -- pesos chilenos con IVA
+  token VARCHAR(64) NULL UNIQUE,
+  orden_compra VARCHAR(26) NOT NULL,
+  codigo_autorizacion VARCHAR(10) NULL,
+  tipo_pago VARCHAR(4) NULL,                         -- VD débito · VN crédito · VC cuotas · VP prepago...
+  cuotas TINYINT NULL,
+  tarjeta_ultimos4 CHAR(4) NULL,
+  fecha_creacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  fecha_respuesta DATETIME NULL,
+  CONSTRAINT fk_pago_pedido FOREIGN KEY (id_pedido) REFERENCES pedido(id_pedido),
+  CONSTRAINT ck_pago_estado CHECK (estado IN ('Pendiente','Aprobado','Rechazado','Anulado')),
+  INDEX ix_pago_estado (estado, fecha_creacion)
 ) ENGINE=InnoDB;
 
 SET FOREIGN_KEY_CHECKS = 1;

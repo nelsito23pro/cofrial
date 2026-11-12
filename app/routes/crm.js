@@ -125,9 +125,11 @@ router.patch("/oportunidades/:id", ok(async (req, res) => {
 router.get("/pedidos", ok(async (req, res) => {
   const where = req.query.estado ? "WHERE v.estado=?" : "";
   const pedidos = await query(`SELECT v.*, p.observacion, co.nombre AS comuna,
-      (SELECT d.camion_id FROM despacho_pedido dp JOIN despacho d ON d.id_despacho=dp.id_despacho WHERE dp.id_pedido=v.id_pedido ORDER BY d.id_despacho DESC LIMIT 1) AS camion_id
+      (SELECT d.camion_id FROM despacho_pedido dp JOIN despacho d ON d.id_despacho=dp.id_despacho WHERE dp.id_pedido=v.id_pedido ORDER BY d.id_despacho DESC LIMIT 1) AS camion_id,
+      pg.estado AS pago_estado, pg.tarjeta_ultimos4 AS pago_tarjeta, pg.codigo_autorizacion AS pago_autorizacion
     FROM v_pedido_total v JOIN pedido p ON p.id_pedido=v.id_pedido JOIN direccion di ON di.id_direccion=p.id_direccion
-    JOIN comuna co ON co.id_comuna=di.id_comuna ${where} ORDER BY v.fecha_pedido DESC LIMIT 200`, req.query.estado ? [req.query.estado] : []);
+    JOIN comuna co ON co.id_comuna=di.id_comuna
+    LEFT JOIN pago pg ON pg.id_pago=(SELECT MAX(id_pago) FROM pago WHERE id_pedido=v.id_pedido) ${where} ORDER BY v.fecha_pedido DESC LIMIT 200`, req.query.estado ? [req.query.estado] : []);
   res.json(pedidos);
 }));
 
