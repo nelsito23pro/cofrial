@@ -35,6 +35,7 @@ async function cabecera(activa) {
   const perfil = SESION
     ? `<span class="badge badge-perfil me-2">Perfil ${esc(SESION.tipo)} · ${esc(SESION.lista)}${SESION.estado === "Prospecto" ? " · pendiente de aprobación" : ""}</span>
        <a class="nav-link d-inline text-white ${activa === "pedidos" ? "fw-bold" : ""}" href="/mis-pedidos">Mis pedidos</a>
+       <a class="nav-link d-inline text-white ${activa === "casos" ? "fw-bold" : ""}" href="/mis-casos">Mis casos</a>
        <a class="nav-link d-inline text-white-50" href="#" id="salir">Salir</a>`
     : `<a class="btn btn-sm btn-light" href="/cuenta">Ingresar / Registrarse</a>`;
   document.getElementById("cabecera").innerHTML = `
@@ -53,6 +54,17 @@ async function cabecera(activa) {
 }
 
 // ---------- asistente IA ----------
+let CHAT_PEDIDO = null;   // pedido sobre el que el cliente reporta un problema (desde "Mis pedidos")
+function reportarProblema(idPedido) {
+  CHAT_PEDIDO = idPedido;
+  document.getElementById("chat-box").style.display = "block";
+  document.getElementById("chat-contexto").innerHTML = `<div class="alert alert-warning py-1 px-2 mb-0 small d-flex justify-content-between align-items-center">
+    <span>Reportando un problema con el <b>pedido N° ${Number(idPedido)}</b></span>
+    <button type="button" class="btn-close btn-sm" onclick="CHAT_PEDIDO=null;this.closest('.alert').remove()"></button></div>`;
+  const input = document.getElementById("chat-input");
+  input.placeholder = "Cuéntanos qué pasó: producto, cantidad y estado en que llegó...";
+  input.focus();
+}
 function montarChat() {
   if (document.getElementById("chat-btn")) return;
   document.body.insertAdjacentHTML("beforeend", `
@@ -60,6 +72,7 @@ function montarChat() {
   <div id="chat-box" class="card shadow">
     <div class="card-header d-flex justify-content-between align-items-center"><strong>Asistente Cofrial</strong>
       <button class="btn-close btn-sm" id="chat-cerrar"></button></div>
+    <div id="chat-contexto"></div>
     <div id="chat-log" class="card-body p-2"><div class="msg msg-ia">Hola, ¿en qué te ayudo? Puedes consultar despachos, hacer un pedido o informar un problema con tu entrega.</div></div>
     <form id="chat-form" class="card-footer d-flex gap-2 p-2">
       <input class="form-control form-control-sm" id="chat-input" placeholder="Escribe tu mensaje..." autocomplete="off" maxlength="1000">
@@ -75,9 +88,11 @@ function montarChat() {
     log.insertAdjacentHTML("beforeend", `<div class="msg msg-yo">${esc(texto)}</div>`);
     log.scrollTop = log.scrollHeight;
     try {
-      const r = await api("/api/chat", { method: "POST", body: { mensaje: texto } });
+      const r = await api("/api/chat", { method: "POST", body: { mensaje: texto, id_pedido: CHAT_PEDIDO } });
       log.insertAdjacentHTML("beforeend", `<div class="msg msg-ia">${esc(r.respuesta)}
-        <div class="msg-meta">Clasificado como <b>${esc(r.categoria)}</b> · prioridad ${r.prioridad} · motor ${esc(r.motor)}${r.registrado ? " · enviado a tu ejecutivo" : " · inicia sesión para registrar tu caso"}</div></div>`);
+        <div class="msg-meta">Clasificado como <b>${esc(r.categoria)}</b> · prioridad ${r.prioridad} · motor ${esc(r.motor)}${r.registrado
+          ? ` · caso N° ${r.id_requerimiento}${CHAT_PEDIDO ? ` (pedido N° ${CHAT_PEDIDO})` : ""} enviado a tu ejecutivo · <a href="/mis-casos">ver en Mis casos</a>`
+          : " · inicia sesión para registrar tu caso"}</div></div>`);
     } catch (err) {
       log.insertAdjacentHTML("beforeend", `<div class="msg msg-ia text-danger">${esc(err.message)}</div>`);
     }

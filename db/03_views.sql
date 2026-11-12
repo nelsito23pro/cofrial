@@ -40,3 +40,16 @@ SELECT t.* , c.temp_min, c.temp_max, c.patente
 FROM telemetria t
 JOIN (SELECT camion_id, MAX(id_lectura) AS ult FROM telemetria GROUP BY camion_id) u ON u.ult = t.id_lectura
 JOIN camion c ON c.camion_id = t.camion_id;
+
+-- Casos de atención con su plazo (SLA) según prioridad: Alta 2 h · Media 24 h · Baja 72 h
+CREATE OR REPLACE VIEW v_caso AS
+SELECT r.*, cr.nombre AS categoria, c.nombre AS cliente, tc.nombre AS tipo_cliente, c.id_vendedor,
+       r.fecha + INTERVAL (CASE r.prioridad WHEN 1 THEN 2 WHEN 2 THEN 24 ELSE 72 END) HOUR AS fecha_limite,
+       CASE WHEN r.estado = 'Resuelto'
+            THEN r.fecha_resolucion <= r.fecha + INTERVAL (CASE r.prioridad WHEN 1 THEN 2 WHEN 2 THEN 24 ELSE 72 END) HOUR
+            ELSE NOW() <= r.fecha + INTERVAL (CASE r.prioridad WHEN 1 THEN 2 WHEN 2 THEN 24 ELSE 72 END) HOUR END AS en_plazo,
+       ROUND(TIMESTAMPDIFF(MINUTE, r.fecha, r.fecha_resolucion) / 60, 1) AS horas_resolucion
+FROM requerimiento r
+JOIN cliente c       ON c.id_cliente = r.id_cliente
+JOIN tipo_cliente tc ON tc.id_tipo = c.id_tipo
+LEFT JOIN categoria_requerimiento cr ON cr.id_categoria_req = r.id_categoria_req;

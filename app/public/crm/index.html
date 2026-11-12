@@ -50,6 +50,11 @@
         <div class="col-xl-4"><div class="card border-0 shadow-sm"><div class="card-body"><h6 class="fw-bold">Pipeline (monto por etapa)</h6><canvas id="c-pipe" height="200"></canvas></div></div></div>
         <div class="col-xl-4"><div class="card border-0 shadow-sm"><div class="card-body"><h6 class="fw-bold">Alertas de frío por camión (24 h)</h6><canvas id="c-alertas" height="200"></canvas></div></div></div>
       </div>
+      <h5 class="fw-bold mt-4 mb-3">Atención al cliente <span class="small text-muted fw-normal">· casos abiertos ahora y desempeño de los últimos 30 días</span></h5>
+      <div class="row g-3">
+        <div class="col-xl-8"><div class="row g-3" id="kpis-casos"></div></div>
+        <div class="col-xl-4"><div class="card border-0 shadow-sm"><div class="card-body"><h6 class="fw-bold">Casos por categoría (30 días)</h6><canvas id="c-casos" height="170"></canvas></div></div></div>
+      </div>
     </section>
 
     <section id="s-clientes" style="display:none">
@@ -80,10 +85,12 @@
     </section>
 
     <section id="s-requerimientos" style="display:none">
-      <h3 class="fw-bold">Requerimientos clasificados por IA</h3>
-      <p class="text-muted small">Mensajes del chat de la tienda. La IA asigna categoría y prioridad; las urgencias de cadena de frío aparecen primero.</p>
+      <div class="d-flex justify-content-between align-items-center mb-1"><h3 class="fw-bold mb-0">Casos de clientes (IA)</h3>
+        <select id="r-estado-f" class="form-select" style="max-width:200px"><option value="abiertos">Casos abiertos</option><option value="resueltos">Resueltos</option><option value="">Todos</option></select></div>
+      <p class="text-muted small">Mensajes del chat de la tienda. La IA asigna categoría y prioridad, y cada caso tiene un plazo de atención:
+        <b>Alta 2 h · Media 24 h · Baja 72 h</b>. Presiona <b>Gestionar</b> para revisar el pedido, la evidencia IoT del despacho y resolverlo.</p>
       <div class="card border-0 shadow-sm"><div class="table-responsive"><table class="table mb-0 align-middle small">
-        <thead><tr><th>Fecha</th><th>Cliente</th><th>Categoría IA</th><th>Prioridad</th><th>Mensaje</th><th>Respuesta IA</th><th></th></tr></thead>
+        <thead><tr><th>N°</th><th>Fecha</th><th>Cliente</th><th>Pedido</th><th>Categoría</th><th>Prioridad</th><th>Plazo</th><th>Estado</th><th>Mensaje</th><th></th></tr></thead>
         <tbody id="t-req"></tbody></table></div></div>
     </section>
 
@@ -126,6 +133,10 @@
     <label class="form-label small fw-bold">Camión</label><select name="camion_id" id="ruta-camion" class="form-select mb-2"></select>
     <label class="form-label small fw-bold">Conductor</label><select name="id_conductor" id="ruta-conductor" class="form-select"></select></div>
   <div class="modal-footer"><button class="btn btn-primary">Despachar</button></div></form></div></div>
+
+<div class="modal fade" id="m-caso" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title" id="caso-titulo"></h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body" id="caso-cuerpo"></div></div></div></div>
 
 <script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 <script src="/vendor/chart.js/chart.umd.js"></script>

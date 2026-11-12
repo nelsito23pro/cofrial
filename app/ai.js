@@ -10,13 +10,18 @@ Despachamos de lunes a sábado en La Araucanía, Los Ríos y Biobío. Los client
 Clasifica el mensaje del cliente y responde SOLO con JSON válido, sin texto adicional, con esta forma:
 {"categoria": una de ${JSON.stringify(CATEGORIAS)}, "prioridad": 1 (alta), 2 (media) o 3 (baja), "respuesta": "respuesta breve y amable en español, máximo 2 frases"}
 Reglas: si menciona producto descongelado, blando, tibio, mal olor o temperatura, la categoría es "Urgencia cadena de frío" con prioridad 1.
+Si menciona un producto en mal estado, vencido, podrido, contaminado o con hongos, la categoría es "Reclamo" con prioridad 1 (inocuidad alimentaria): pide no consumirlo.
+Otros reclamos (faltantes, atrasos, errores) son "Reclamo" con prioridad 2.
 Mensaje del cliente: """${mensaje}"""`;
+
 
 function local(mensaje) {
   const m = mensaje.toLowerCase();
   if (/(descongel|blando|tibi|calient|temperatura|mal olor|olor|cadena de fr)/.test(m))
     return { categoria: "Urgencia cadena de frío", prioridad: 1, respuesta: "Lamentamos lo ocurrido. Registramos tu caso como urgencia de cadena de frío y un ejecutivo te contactará de inmediato." };
-  if (/(reclamo|mal estado|incomplet|atras|no lleg|error|falt|devoluc)/.test(m))
+  if (/(mal estado|vencid|podrid|contamin|hongo|moho|descompuest|rancio|intoxic)/.test(m))   // inocuidad alimentaria
+    return { categoria: "Reclamo", prioridad: 1, respuesta: "Lamentamos lo ocurrido. Por seguridad, no consumas el producto. Tu caso quedó con prioridad alta y tu ejecutivo te contactará en menos de 2 horas para reponerlo." };
+  if (/(reclamo|incomplet|atras|no lleg|error|falt|devoluc)/.test(m))
     return { categoria: "Reclamo", prioridad: 2, respuesta: "Registramos tu reclamo y tu ejecutivo comercial lo revisará hoy mismo." };
   if (/(pedido|comprar|cotiz|necesito|quiero|cajas|kilos|kg)/.test(m))
     return { categoria: "Pedido", prioridad: 2, respuesta: "Puedes hacer tu pedido directamente en el catálogo; tu ejecutivo también recibirá esta solicitud." };
@@ -77,3 +82,5 @@ async function clasificar(mensaje) {
 }
 
 module.exports = { clasificar, CATEGORIAS };
+
+//cgfbdf

@@ -29,7 +29,7 @@ const fila = (k, v) => `<tr><th class="text-start fw-normal text-muted">${k}</th
     const p = await api("/api/pagos/pedido/" + encodeURIComponent(id));
     const aprobado = p.pago_estado === "Aprobado";
     if (aprobado) Carrito.vaciar();   // si el pago falla, el carrito se conserva para reintentar
-    const titulo = { Aprobado: ["✅", "Pago aprobado"], Rechazado: ["❌", "Pago rechazado"], Anulado: ["↩️", "Pago anulado"], Pendiente: ["⏳", "Pago en proceso"] }[p.pago_estado] || ["ℹ️", "Pedido sin pago"];
+    const titulo = { Aprobado: ["✅", "Pago aprobado"], Rechazado: ["❌", "Pago rechazado"], Anulado: ["↩️", "Pago anulado"], Reembolsado: ["↩️", "Pago reembolsado"], Pendiente: ["⏳", "Pago en proceso"] }[p.pago_estado] || ["ℹ️", "Pedido sin pago"];
     el.className = "py-5";
     el.innerHTML = `<div class="text-center"><div style="font-size:4rem">${titulo[0]}</div><h2 class="fw-bold">${titulo[1]}</h2>
       <p class="text-muted">${aprobado ? "Tu pedido ya está en el CRM de Cofrial y será despachado en camión refrigerado."

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Crea la base cofrial_db en Amazon RDS y carga esquema (30 tablas), datos de demostración y vistas BI.
+# Crea la base cofrial_db en Amazon RDS y carga esquema (31 tablas), datos de demostración y vistas BI.
 # Uso (desde la carpeta raíz del proyecto, con el archivo .env completo):  bash scripts/cargar-bd.sh
 # ATENCIÓN: 01_schema.sql BORRA y recrea la base. Úsalo solo para inicializar o reiniciar la demo.
 set -euo pipefail

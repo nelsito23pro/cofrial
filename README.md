@@ -5,6 +5,7 @@ Prototipo funcional del ecosistema diseñado en el Hito 1. Incluye:
 - **E-commerce B2B/B2C:** catálogo de productos refrigerados con listas de precios por perfil, carrito de compras, checkout (orden de compra y crédito para B2B, pago con **Webpay Plus** para B2C) y generación de órdenes.
 - **CRM operativo:** clientes y prospectos, aprobación de cuentas B2B, pipeline Kanban, pedidos web con despacho y requerimientos.
 - **IA de costo cero:** chat que clasifica requerimientos y les asigna prioridad. Funciona con Groq o Gemini (capas gratuitas) y tiene un clasificador local de respaldo.
+- **Gestión de casos de clientes:** cada mensaje del chat es un caso con plazo según prioridad (Alta 2 h, Media 24 h, Baja 72 h). El ejecutivo ve el pedido y la **evidencia IoT del camión que lo despachó**, y lo resuelve con reposición sin costo, reembolso Webpay, nota de crédito o respuesta. El cliente sigue el caso en *Mis casos* y califica la atención (1 a 5 ⭐).
 - **Simulación IoT:** contenedores Docker (uno por camión) en una EC2 dedicada. Cada contenedor inserta cada 5 s en RDS `camion_id`, `temp_camara`, `lat`, `lon`, `combustible_pct` y `alerta_ruptura_frio`.
 - **Business Intelligence en vivo:** dashboard en Grafana y panel BI dentro del CRM. Ambos cruzan las ventas (por día, canal y perfil) con las alertas de la cadena de frío.
 
@@ -22,9 +23,9 @@ EC2 IoT (subred pública 10.0.2.0/24) ─ contenedores cam01 … cam05 (simulado
 
 | Carpeta / archivo | Contenido |
 | --- | --- |
-| `db/01_schema.sql` | Esquema MySQL 8 en 3FN (30 tablas): el MER del Hito 1 más la tabla `pago` de la pasarela Webpay |
+| `db/01_schema.sql` | Esquema MySQL 8 en 3FN (31 tablas): el MER del Hito 1 más `pago` (Webpay) y `tipo_solucion` (gestión de casos) |
 | `db/02_seed.sql` | Datos de demostración: productos, listas de precios, clientes, 40 pedidos, 10 camiones y 14 días de telemetría (se regenera con `gen_seed.py`) |
-| `db/03_views.sql` | Vistas para el BI: totales de pedido, ventas diarias, alertas diarias, cruce ventas vs. alertas y última lectura de cada camión |
+| `db/03_views.sql` | Vistas para el BI: totales de pedido, ventas diarias, alertas diarias, cruce ventas vs. alertas, última lectura de cada camión y casos con su plazo (`v_caso`) |
 | `app/` | Backend Node.js + Express, páginas de la tienda y del CRM, integración con IA (`ai.js`) y pasarela Webpay Plus (`routes/pagos.js`) |
 | `iot/` | Simulador Python, Dockerfile y `docker-compose.yml` del nodo IoT |
 | `grafana/` | Datasource y dashboard aprovisionados automáticamente |
@@ -160,10 +161,10 @@ Si usaste el *User data*, revisa que Docker esté listo con `docker compose vers
 ```bash
 cp .env.example .env
 nano .env                  # DB_HOST = endpoint de RDS, DB_PASS = clave maestra, SESSION_SECRET = texto aleatorio
-bash scripts/cargar-bd.sh  # crea cofrial_db con 30 tablas, datos demo y vistas
+bash scripts/cargar-bd.sh  # crea cofrial_db con 31 tablas, datos demo y vistas
 ```
 
-Si el script responde con 30 tablas, 14 productos, 9 clientes, 40 pedidos y 10 camiones, la conexión EC2 → RDS funciona y la seguridad está bien configurada.
+Si el script responde con 31 tablas, 14 productos, 9 clientes, 40 pedidos y 10 camiones, la conexión EC2 → RDS funciona y la seguridad está bien configurada.
 
 ### Paso 8. Levantar la tienda, el CRM y Grafana (en la EC2 Web)
 
@@ -227,7 +228,11 @@ Si la API falla o llega al límite gratuito, el sistema usa automáticamente el 
 7. **BI.**
    - En el **Panel BI** del CRM o en Grafana, muestra el cruce de ventas diarias con alertas de frío, las ventas por canal (Web vs. CRM vs. Teléfono), B2B vs. B2C y las alertas por camión.
    - Destaca que el panel se actualiza solo.
-8. **IA.** En el chat, escribe un reclamo de cadena de frío y muestra cómo aparece clasificado con prioridad alta en **Requerimientos IA**.
+8. **IA y gestión de casos.**
+   - Como `camila.rojas@mail.cl`, en **Mis pedidos** presiona **⚠ Reportar un problema** en un pedido entregado y escribe *"el lomo vetado llegó en mal estado"*. La IA lo clasifica como reclamo de prioridad **Alta** (plazo 2 h).
+   - En el CRM, abre **Casos de clientes (IA)** y presiona **Gestionar**. Muestra el pedido, el pago y la **evidencia IoT**: temperatura del camión durante el despacho y sus alertas. El caso N° 1 de los datos demo tiene una alerta real de CAM-03.
+   - Resuélvelo con **Reposición**: se crea un pedido sin costo y se descuenta stock. En la tienda, el cliente ve la respuesta en **Mis casos** y califica con estrellas.
+   - En el **Panel BI**, sección *Atención al cliente*, muestra casos abiertos, vencidos, tiempo promedio, % en plazo y satisfacción.
 
 ## Qué hacer cada vez que se inicia el laboratorio
 

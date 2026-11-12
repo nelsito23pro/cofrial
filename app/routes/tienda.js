@@ -132,17 +132,38 @@ router.post("/chat", ok(async (req, res) => {
   const mensaje = String(req.body.mensaje || "").trim().slice(0, 1000);
   if (!mensaje) return res.status(400).json({ error: "Escribe un mensaje" });
   const ia = await clasificar(mensaje);
-  let registrado = false;
-  if (req.session.cliente) { // con sesión, el requerimiento queda en el CRM (adiós WhatsApp)
+  let registrado = false, id_requerimiento = null;
+  if (req.session.cliente) { // con sesión, el requerimiento queda en el CRM como caso (adiós WhatsApp)
     const id = req.session.cliente.id_cliente;
-    const [[cat]] = await require("../db").pool.query("SELECT id_categoria_req FROM categoria_requerimiento WHERE nombre=?", [ia.categoria]);
-    await query("INSERT INTO requerimiento (id_cliente,id_pedido,id_categoria_req,mensaje,respuesta_ia,prioridad) VALUES (?,?,?,?,?,?)",
-      [id, req.body.id_pedido || null, cat ? cat.id_categoria_req : null, mensaje, ia.respuesta, ia.prioridad]);
+    // "Reportar un problema" desde Mis pedidos: el pedido solo se asocia si es del mismo cliente
+    const [ped] = req.body.id_pedido ? await query("SELECT id_pedido FROM pedido WHERE id_pedido=? AND id_cliente=?", [req.body.id_pedido, id]) : [];
+    const [cat] = await query("SELECT id_categoria_req FROM categoria_requerimiento WHERE nombre=?", [ia.categoria]);
+    const r = await query("INSERT INTO requerimiento (id_cliente,id_pedido,id_categoria_req,mensaje,respuesta_ia,prioridad) VALUES (?,?,?,?,?,?)",
+      [id, ped ? ped.id_pedido : null, cat ? cat.id_categoria_req : null, mensaje, ia.respuesta, ia.prioridad]);
     await query("INSERT INTO interaccion (id_cliente,id_usuario,id_tipo_interaccion,detalle) VALUES (?,NULL,4,?)",
-      [id, `Chat IA [${ia.categoria}]: ${mensaje.slice(0, 200)}`]);
+      [id, `Chat IA [${ia.categoria}]${ped ? ` pedido N° ${ped.id_pedido}` : ""}: ${mensaje.slice(0, 200)}`]);
     registrado = true;
+    id_requerimiento = r.insertId;
   }
-  res.json({ ...ia, registrado });
+  res.json({ ...ia, registrado, id_requerimiento });
+}));
+
+// ---------- mis casos de atención (seguimiento y encuesta de satisfacción) ----------
+router.get("/mis-casos", soloCliente, ok(async (req, res) => res.json(await query(
+  `SELECT v.id_requerimiento, v.fecha, v.mensaje, v.respuesta_ia, v.categoria, v.prioridad, v.estado, v.id_pedido, v.fecha_limite,
+      v.respuesta_ejecutivo, v.monto_compensacion, v.id_pedido_reposicion, v.fecha_resolucion, v.calificacion, v.comentario_cliente,
+      ts.nombre AS solucion, u.nombre AS ejecutivo
+   FROM v_caso v LEFT JOIN tipo_solucion ts ON ts.id_solucion=v.id_solucion LEFT JOIN usuario u ON u.id_usuario=v.id_usuario
+   WHERE v.id_cliente=? ORDER BY v.estado='Resuelto', v.fecha DESC`, [req.session.cliente.id_cliente]))));
+
+router.post("/mis-casos/:id/calificar", soloCliente, ok(async (req, res) => {
+  const nota = Number(req.body.calificacion);
+  if (![1, 2, 3, 4, 5].includes(nota)) return res.status(400).json({ error: "Elige una calificación de 1 a 5 estrellas" });
+  const r = await query(`UPDATE requerimiento SET calificacion=?, comentario_cliente=?, fecha_calificacion=NOW()
+    WHERE id_requerimiento=? AND id_cliente=? AND estado='Resuelto' AND calificacion IS NULL`,
+    [nota, String(req.body.comentario || "").trim().slice(0, 500) || null, req.params.id, req.session.cliente.id_cliente]);
+  if (!r.affectedRows) return res.status(409).json({ error: "Este caso no se puede calificar (no está resuelto o ya fue calificado)" });
+  res.json({ ok: true });
 }));
 
 module.exports = router;

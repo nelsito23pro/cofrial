@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mis casos · Cofrial SpA</title>
+<link href="/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+<link href="/css/styles.css" rel="stylesheet">
+<style>.estrellas button { font-size: 1.6rem; background: none; border: 0; padding: 0 2px; filter: grayscale(1); opacity: .5 }
+.estrellas button.on { filter: none; opacity: 1 }</style>
+</head>
+<body>
+<div id="cabecera"></div>
+<main class="container pb-5">
+<div id="aviso"></div>
+<h2 class="fw-bold mb-1">Mis casos</h2>
+<p class="text-muted">Seguimiento de tus consultas y reclamos. Para reportar un problema con una entrega, usa <b>⚠ Reportar un problema</b> en <a href="/mis-pedidos">Mis pedidos</a>.</p>
+<div id="lista"></div>
+</main>
+<script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="/js/common.js"></script>
+<script>
+const COLOR_CASO = { "Nuevo": "primary", "En gestión": "warning text-dark", "Resuelto": "success" };
+const PRIORIDAD = { 1: "Alta", 2: "Media", 3: "Baja" };
+const NOTA = {};   // calificación elegida en cada caso antes de enviar
+
+function encuesta(c) {
+  if (c.calificacion) return `<div class="mt-2">Tu calificación: <span class="fs-5">${"⭐".repeat(c.calificacion)}</span>
+    ${c.comentario_cliente ? `<div class="small fst-italic text-muted">“${esc(c.comentario_cliente)}”</div>` : ""}</div>`;
+  return `<div class="border-top mt-3 pt-2"><div class="fw-bold small">¿Cómo evaluarías la atención recibida?</div>
+    <div class="estrellas" id="est-${c.id_requerimiento}">${[1, 2, 3, 4, 5].map((n) =>
+      `<button type="button" title="${n} de 5" onclick="elegir(${c.id_requerimiento}, ${n})">⭐</button>`).join("")}</div>
+    <div class="d-flex gap-2 mt-1"><input class="form-control form-control-sm" id="com-${c.id_requerimiento}" maxlength="500" placeholder="Comentario (opcional)">
+      <button class="btn btn-sm btn-primary" onclick="calificar(${c.id_requerimiento})">Enviar</button></div></div>`;
+}
+function elegir(id, n) {
+  NOTA[id] = n;
+  document.querySelectorAll(`#est-${id} button`).forEach((b, i) => b.classList.toggle("on", i < n));
+}
+async function calificar(id) {
+  if (!NOTA[id]) return aviso("Elige de 1 a 5 estrellas antes de enviar.", "warning");
+  try {
+    await api(`/api/mis-casos/${id}/calificar`, { method: "POST", body: { calificacion: NOTA[id], comentario: document.getElementById("com-" + id).value } });
+    aviso("¡Gracias por tu evaluación! Nos ayuda a mejorar la atención.");
+    cargar();
+  } catch (e) { aviso(esc(e.message), "danger"); }
+}
+
+async function cargar() {
+  const casos = await api("/api/mis-casos");
+  document.getElementById("lista").innerHTML = casos.map((c) => {
+    const resuelto = c.estado === "Resuelto";
+    return `<div class="card border-0 shadow-sm mb-3"><div class="card-body">
+      <div class="d-flex justify-content-between flex-wrap gap-2">
+        <div><b>Caso N° ${c.id_requerimiento}</b> <span class="text-muted small">· ${esc(c.fecha.slice(0, 16))} · ${esc(c.categoria || "Consulta")}
+          ${c.id_pedido ? ` · pedido N° ${c.id_pedido}` : ""} · prioridad ${PRIORIDAD[c.prioridad] || "—"}</span></div>
+        <span class="badge bg-${COLOR_CASO[c.estado]}">${esc(c.estado)}</span>
+      </div>
+      <div class="mt-2">“${esc(c.mensaje)}”</div>
+      <div class="small text-muted">🤖 ${esc(c.respuesta_ia || "")}</div>
+      ${resuelto ? `<div class="alert alert-success mt-3 mb-0 small">
+          <b>Respuesta de ${esc(c.ejecutivo || "tu ejecutivo")}</b> · ${esc((c.fecha_resolucion || "").slice(0, 16))}<br>${esc(c.respuesta_ejecutivo || "")}
+          ${c.solucion && c.solucion !== "Solo respuesta" ? `<div class="mt-1"><b>Solución:</b> ${esc(c.solucion)}${c.monto_compensacion ? " · " + CLP(c.monto_compensacion) : ""}
+            ${c.id_pedido_reposicion ? ` · pedido de reposición N° ${c.id_pedido_reposicion} (<a href="/mis-pedidos">ver</a>)` : ""}</div>` : ""}
+        </div>${encuesta(c)}`
+      : `<div class="small mt-2">⏱ Tu ejecutivo responderá antes del <b>${esc(c.fecha_limite.slice(0, 16))}</b>${c.estado === "En gestión" ? " · ya está trabajando en tu caso" : ""}.</div>`}
+    </div></div>`;
+  }).join("") || `<p class="text-muted">No tienes casos registrados.</p>`;
+}
+(async () => {
+  const s = await cabecera("casos");
+  if (!s) { location.href = "/cuenta?volver=/mis-casos"; return; }
+  cargar();
+})();
+</script></body></html>

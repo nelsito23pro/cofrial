@@ -21,7 +21,7 @@ panels = [
     stat("% pedidos por web (14 días)", 8, "SELECT ROUND(100*SUM(id_canal=1)/COUNT(*)) AS pct FROM pedido WHERE fecha_pedido >= CURDATE() - INTERVAL 13 DAY", "percent"),
     stat("Alertas de frío (última hora)", 12, "SELECT COUNT(*) AS alertas FROM telemetria WHERE alerta_ruptura_frio AND fecha_hora >= NOW() - INTERVAL 1 HOUR", rojo=1),
     stat("Camiones transmitiendo (1 min)", 16, "SELECT COUNT(DISTINCT camion_id) AS camiones FROM telemetria WHERE fecha_hora >= NOW() - INTERVAL 1 MINUTE"),
-    stat("Requerimientos IA abiertos", 20, "SELECT COUNT(*) AS abiertos FROM requerimiento WHERE NOT resuelto", rojo=1),
+    stat("Requerimientos IA abiertos", 20, "SELECT COUNT(*) AS abiertos FROM requerimiento WHERE estado <> 'Resuelto'", rojo=1),
     panel("timeseries", "Ventas diarias vs. alertas de ruptura de frío (14 días)", 0, 4, 14, 9, [
         q("SELECT UNIX_TIMESTAMP(dia) AS time, ventas_netas AS 'Ventas netas' FROM v_ventas_vs_alertas WHERE dia >= CURDATE() - INTERVAL 13 DAY ORDER BY dia", "time_series", "A"),
         q("SELECT UNIX_TIMESTAMP(dia) AS time, alertas_frio AS 'Alertas de frío' FROM v_ventas_vs_alertas WHERE dia >= CURDATE() - INTERVAL 13 DAY ORDER BY dia", "time_series", "B")],

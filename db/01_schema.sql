@@ -2,7 +2,7 @@ SET NAMES utf8mb4;
 -- =====================================================================
 -- Cofrial SpA · Base de datos cofrial_db (MySQL 8 / Amazon RDS)
 -- Modelo en 3FN: Seguridad, Geografía, Comercial, Catálogo/Inventario,
--- E-commerce, CRM, Logística e IoT  (30 tablas)
+-- E-commerce, CRM, Logística e IoT  (31 tablas)
 -- =====================================================================
 -- ATENCIÓN: este script recrea la base desde cero (borra los datos existentes).
 DROP DATABASE IF EXISTS cofrial_db;
@@ -218,6 +218,14 @@ CREATE TABLE categoria_requerimiento (
   nombre VARCHAR(40) NOT NULL UNIQUE
 ) ENGINE=InnoDB;
 
+-- Forma en que se resuelve un caso: Reposición, Reembolso Webpay, Nota de crédito, Solo respuesta
+CREATE TABLE tipo_solucion (
+  id_solucion INT AUTO_INCREMENT PRIMARY KEY,
+  nombre VARCHAR(40) NOT NULL UNIQUE
+) ENGINE=InnoDB;
+
+-- Caso de atención al cliente: nace en el chat IA y lo gestiona un ejecutivo en el CRM.
+-- El plazo (SLA) se calcula según la prioridad en la vista v_caso (no se almacena: 3FN).
 CREATE TABLE requerimiento (
   id_requerimiento INT AUTO_INCREMENT PRIMARY KEY,
   id_cliente INT NOT NULL,
@@ -226,12 +234,27 @@ CREATE TABLE requerimiento (
   mensaje TEXT NOT NULL,
   respuesta_ia TEXT NULL,
   prioridad TINYINT NULL,
-  resuelto BOOLEAN NOT NULL DEFAULT FALSE,
+  estado VARCHAR(20) NOT NULL DEFAULT 'Nuevo',        -- Nuevo · En gestión · Resuelto
   fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  id_usuario INT NULL,                                 -- ejecutivo que gestiona/resuelve el caso
+  id_solucion INT NULL,
+  respuesta_ejecutivo TEXT NULL,                       -- mensaje que ve el cliente en "Mis casos"
+  monto_compensacion INT NULL,                         -- reembolso o nota de crédito (CLP)
+  id_pedido_reposicion INT NULL,                       -- pedido sin costo creado como reposición
+  fecha_resolucion DATETIME NULL,
+  calificacion TINYINT NULL,                           -- encuesta de satisfacción del cliente (1 a 5)
+  comentario_cliente VARCHAR(500) NULL,
+  fecha_calificacion DATETIME NULL,
   CONSTRAINT fk_req_cliente FOREIGN KEY (id_cliente) REFERENCES cliente(id_cliente),
   CONSTRAINT fk_req_pedido FOREIGN KEY (id_pedido) REFERENCES pedido(id_pedido),
   CONSTRAINT fk_req_categoria FOREIGN KEY (id_categoria_req) REFERENCES categoria_requerimiento(id_categoria_req),
-  CONSTRAINT ck_req_prioridad CHECK (prioridad BETWEEN 1 AND 3)
+  CONSTRAINT fk_req_usuario FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
+  CONSTRAINT fk_req_solucion FOREIGN KEY (id_solucion) REFERENCES tipo_solucion(id_solucion),
+  CONSTRAINT fk_req_reposicion FOREIGN KEY (id_pedido_reposicion) REFERENCES pedido(id_pedido),
+  CONSTRAINT ck_req_prioridad CHECK (prioridad BETWEEN 1 AND 3),
+  CONSTRAINT ck_req_estado CHECK (estado IN ('Nuevo','En gestión','Resuelto')),
+  CONSTRAINT ck_req_calificacion CHECK (calificacion BETWEEN 1 AND 5),
+  INDEX ix_req_estado (estado, prioridad, fecha)
 ) ENGINE=InnoDB;
 
 -- ---------- Logística e IoT ----------
@@ -293,7 +316,7 @@ CREATE TABLE pago (
   id_pago INT AUTO_INCREMENT PRIMARY KEY,
   id_pedido INT NOT NULL,
   metodo VARCHAR(30) NOT NULL DEFAULT 'Webpay Plus',
-  estado VARCHAR(20) NOT NULL DEFAULT 'Pendiente',   -- Pendiente · Aprobado · Rechazado · Anulado
+  estado VARCHAR(20) NOT NULL DEFAULT 'Pendiente',   -- Pendiente · Aprobado · Rechazado · Anulado · Reembolsado
   monto INT NOT NULL,                                -- pesos chilenos con IVA
   token VARCHAR(64) NULL UNIQUE,
   orden_compra VARCHAR(26) NOT NULL,
@@ -304,7 +327,7 @@ CREATE TABLE pago (
   fecha_creacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   fecha_respuesta DATETIME NULL,
   CONSTRAINT fk_pago_pedido FOREIGN KEY (id_pedido) REFERENCES pedido(id_pedido),
-  CONSTRAINT ck_pago_estado CHECK (estado IN ('Pendiente','Aprobado','Rechazado','Anulado')),
+  CONSTRAINT ck_pago_estado CHECK (estado IN ('Pendiente','Aprobado','Rechazado','Anulado','Reembolsado')),
   INDEX ix_pago_estado (estado, fecha_creacion)
 ) ENGINE=InnoDB;
 

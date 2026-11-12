@@ -111,4 +111,4 @@ async function anularVencidos() {
 }
 setInterval(anularVencidos, 5 * 60 * 1000).unref();
 
-module.exports = router;
+module.exports = Object.assign(router, { webpay });   // el CRM usa webpay.refund() para los reembolsos

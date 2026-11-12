@@ -11,7 +11,7 @@ w = out.append
 q = lambda s: "NULL" if s is None else "'" + str(s).replace("'", "''") + "'"
 
 w("SET NAMES utf8mb4;\nSET time_zone = '-03:00';  -- hora de Chile, igual que el backend\nUSE cofrial_db;\nSET FOREIGN_KEY_CHECKS = 0;")
-for t in ["pago", "telemetria", "despacho_pedido", "despacho", "conductor", "camion", "requerimiento", "categoria_requerimiento",
+for t in ["pago", "tipo_solucion", "telemetria", "despacho_pedido", "despacho", "conductor", "camion", "requerimiento", "categoria_requerimiento",
           "interaccion", "tipo_interaccion", "oportunidad", "etapa_pipeline", "detalle_pedido", "pedido", "estado_pedido", "canal",
           "inventario", "bodega", "precio_producto", "producto", "categoria", "direccion", "cliente", "lista_precio",
           "estado_cliente", "tipo_cliente", "comuna", "region", "usuario", "rol"]:
@@ -36,7 +36,8 @@ w("INSERT INTO lista_precio (id_lista,nombre) VALUES (1,'General B2C'),(2,'Insti
 w("INSERT INTO canal (id_canal,nombre) VALUES (1,'Web'),(2,'Vendedor CRM'),(3,'Teléfono');")
 w("INSERT INTO estado_pedido (id_estado_pedido,nombre,orden) VALUES (1,'Pendiente',1),(2,'Confirmado',2),(3,'En preparación',3),(4,'En ruta',4),(5,'Entregado',5),(6,'Cancelado',6);")
 w("INSERT INTO etapa_pipeline (id_etapa,nombre,orden,probabilidad_pct) VALUES (1,'Prospecto',1,10),(2,'Contactado',2,25),(3,'Cotización enviada',3,50),(4,'Negociación',4,75),(5,'Ganada',5,100),(6,'Perdida',6,0);")
-w("INSERT INTO tipo_interaccion (id_tipo_interaccion,nombre) VALUES (1,'Llamada'),(2,'Correo'),(3,'Reunión'),(4,'Chat IA');")
+w("INSERT INTO tipo_interaccion (id_tipo_interaccion,nombre) VALUES (1,'Llamada'),(2,'Correo'),(3,'Reunión'),(4,'Chat IA'),(5,'Gestión de caso');")
+w("INSERT INTO tipo_solucion (id_solucion,nombre) VALUES (1,'Reposición'),(2,'Reembolso Webpay'),(3,'Nota de crédito'),(4,'Solo respuesta');")
 w("INSERT INTO categoria_requerimiento (id_categoria_req,nombre) VALUES (1,'Pedido'),(2,'Reclamo'),(3,'Consulta'),(4,'Urgencia cadena de frío');")
 
 # ---------- productos ----------
@@ -83,7 +84,7 @@ w("INSERT INTO direccion (id_direccion,id_cliente,id_comuna,calle,numero,referen
 # ---------- pedidos históricos (últimos 14 días) ----------
 activos = [i + 1 for i, c in enumerate(clientes) if c[1] == 2]
 lista_de = {i + 1: c[2] for i, c in enumerate(clientes)}
-peds, dets, pagos = [], [], []
+peds, dets, pagos, ped_info = [], [], [], []
 for pid in range(1, 41):
     cli = random.choice(activos)
     horas = random.randint(2, 14 * 24)
@@ -91,6 +92,7 @@ for pid in range(1, 41):
     estado = 5 if horas > 48 else random.choice([1, 2, 3, 4])
     if random.random() < 0.05: estado = 6
     peds.append(f"({pid},{cli},{cli},{canal},{estado},DATE_SUB(NOW(), INTERVAL {horas} HOUR),NULL)")
+    ped_info.append((pid, cli, horas, estado))
     neto = 0
     for prod in random.sample(range(1, len(prods) + 1), random.randint(1, 4)):
         cant = random.randint(1, 4) if clientes[cli - 1][0] == 2 else random.randint(10, 60)
@@ -120,9 +122,7 @@ w("INSERT INTO interaccion (id_cliente,id_usuario,id_tipo_interaccion,fecha,deta
   "(2,2,3,DATE_SUB(NOW(), INTERVAL 10 DAY),'Reunión de negociación de volumen mensual.'),"
   "(3,3,2,DATE_SUB(NOW(), INTERVAL 11 DAY),'Envío de cotización congelados.'),"
   "(5,2,1,DATE_SUB(NOW(), INTERVAL 7 DAY),'Primer contacto con administrador del casino.');")
-w("INSERT INTO requerimiento (id_cliente,id_pedido,id_categoria_req,mensaje,respuesta_ia,prioridad,resuelto,fecha) VALUES "
-  "(1,NULL,4,'El último despacho de pollo llegó blando, necesitamos revisión urgente.','Clasificado como urgencia de cadena de frío. Un ejecutivo lo contactará de inmediato.',1,TRUE,DATE_SUB(NOW(), INTERVAL 6 DAY)),"
-  "(7,NULL,3,'¿Hacen despacho a Villarrica los fines de semana?','Sí, despachamos a Villarrica de lunes a sábado.',3,TRUE,DATE_SUB(NOW(), INTERVAL 3 DAY));")
+# Los casos de atención (requerimientos) se generan al final: necesitan los despachos y las alertas de la telemetría.
 
 # ---------- logística ----------
 camiones = []
@@ -137,7 +137,7 @@ w("-- Los despachos reales se generan desde el CRM al pasar un pedido a 'En ruta
 
 # ---------- telemetría histórica (1 lectura por camión por hora, 14 días) ----------
 CENTROS = [(-38.7359, -72.5904), (-39.2833, -72.2275), (-38.2389, -72.3311), (-39.8142, -73.2459), (-37.4697, -72.3537)]
-rows = []
+rows, alerta_horas = [], {}
 for c in range(1, 11):
     cong = c % 2 == 1
     tmin, tmax = (-25, -18) if cong else (0, 5)
@@ -147,8 +147,60 @@ for c in range(1, 11):
         t = random.uniform(tmin + 1, tmax - 1)
         if random.random() < 0.03: t = tmax + random.uniform(1.5, 6)
         fuel = 100 if fuel < 10 else fuel - random.choice([0, 1, 1, 2])
+        if not (tmin <= t <= tmax): alerta_horas.setdefault(c, []).append(h)
         rows.append(f"('CAM-{c:02d}',DATE_SUB(NOW(), INTERVAL {h} HOUR),{t:.2f},{lat0 + random.uniform(-0.15, 0.15):.6f},{lon0 + random.uniform(-0.15, 0.15):.6f},{fuel},{1 if not (tmin <= t <= tmax) else 0})")
 for k in range(0, len(rows), 500):
     w("INSERT INTO telemetria (camion_id,fecha_hora,temp_camara,lat,lon,combustible_pct,alerta_ruptura_frio) VALUES " + ",".join(rows[k:k + 500]) + ";")
+
+# ---------- despachos de los pedidos en ruta o entregados (sin random: no altera el resto de los datos) ----------
+# Caso demo: un pedido entregado cuyo despacho en CAM-03 coincidió con una alerta real de ruptura de frío.
+h_alerta = next(h for h in sorted(alerta_horas[3], reverse=True) if 50 <= h <= 250)
+entregados = [x for x in ped_info if x[3] == 5 and x[2] >= h_alerta + 4]
+demo = min([x for x in entregados if x[1] == 7] or entregados, key=lambda x: x[2])   # de preferencia, de Camila Rojas (B2C)
+desp, dps = [], []
+for pid, cli, horas, estado in ped_info:
+    if estado not in (4, 5): continue
+    if pid == demo[0]: cam, sal, ent = "CAM-03", (h_alerta + 2) * 60, (h_alerta - 2) * 60
+    else: cam, sal, ent = f"CAM-{pid % 10 + 1:02d}", horas * 60 - 90, horas * 60 - 450
+    n = len(desp) + 1
+    lleg = f"DATE_SUB(NOW(), INTERVAL {ent} MINUTE)" if estado == 5 else "NULL"
+    desp.append(f"({n},{q(cam)},{pid % 5 + 1},DATE_SUB(NOW(), INTERVAL {sal} MINUTE),{lleg})")
+    dps.append(f"({n},{pid},1,{lleg})")
+w("INSERT INTO despacho (id_despacho,camion_id,id_conductor,fecha_salida,fecha_llegada) VALUES " + ",".join(desp) + ";")
+w("INSERT INTO despacho_pedido (id_despacho,id_pedido,orden_entrega,fecha_entrega) VALUES " + ",".join(dps) + ";")
+
+# ---------- casos de atención (requerimientos) en distintos estados para la demo ----------
+def ultimo(cli):   # último pedido entregado de un cliente
+    xs = [x for x in ped_info if x[1] == cli and x[3] == 5]
+    return min(xs, key=lambda x: x[2])[0] if xs else None
+HACE = lambda m: f"DATE_SUB(NOW(), INTERVAL {m} MINUTE)"
+casos = [  # cliente, pedido, categoría, prioridad, estado, minutos atrás, mensaje, respuesta IA,
+           # ejecutivo, solución, respuesta del ejecutivo, monto, minutos hasta resolver, calificación, comentario
+    (demo[1], demo[0], 4, 1, "Nuevo", 50, "El lomo vetado llegó blando y con olor, parece que se descongeló en el camino.",
+     "Lamentamos lo ocurrido. Registramos tu caso como urgencia de cadena de frío y un ejecutivo te contactará de inmediato.",
+     None, None, None, None, None, None, None),
+    (3, ultimo(3), 2, 2, "En gestión", 30 * 60, "En la última entrega nos faltaron 2 cajas de papas prefritas.",
+     "Registramos tu reclamo y tu ejecutivo comercial lo revisará hoy mismo.", 3, None, None, None, None, None, None),
+    (8, None, 3, 3, "Nuevo", 5 * 60, "¿Despachan a Villarrica el sábado en la mañana?",
+     "Sí, despachamos a Villarrica de lunes a sábado.", None, None, None, None, None, None, None),
+    (1, ultimo(1), 4, 1, "Resuelto", 6 * 1440, "El último despacho de pollo llegó blando, necesitamos revisión urgente.",
+     "Clasificado como urgencia de cadena de frío. Un ejecutivo lo contactará de inmediato.", 2, 3,
+     "Confirmamos una alerta de temperatura en el camión. Emitimos una nota de crédito por el producto afectado.", 120000, 70, 5,
+     "Respondieron muy rápido."),
+    (7, None, 3, 3, "Resuelto", 3 * 1440, "¿Hacen despacho a Villarrica los fines de semana?",
+     "Sí, despachamos a Villarrica de lunes a sábado.", 2, 4,
+     "Despachamos los sábados hasta las 14:00. Puedes dejarlo indicado en las observaciones del pedido.", None, 20 * 60, 4, None),
+    (9, ultimo(9), 2, 2, "Resuelto", 5 * 1440, "Mi pedido llegó con un día de atraso.",
+     "Registramos tu reclamo y tu ejecutivo comercial lo revisará hoy mismo.", 3, 4,
+     "Tuvimos un problema de ruta ese día. Ya reforzamos la planificación de despachos a tu comuna.", None, 30 * 60, 3,
+     "Se demoraron en responder."),
+]
+w("INSERT INTO requerimiento (id_cliente,id_pedido,id_categoria_req,prioridad,estado,fecha,mensaje,respuesta_ia,id_usuario,id_solucion,"
+  "respuesta_ejecutivo,monto_compensacion,fecha_resolucion,calificacion,comentario_cliente,fecha_calificacion) VALUES " + ",".join(
+    f"({c},{q(pe)},{cat},{pr},{q(es)},{HACE(m)},{q(msg)},{q(ia)},{q(u)},{q(so)},{q(rx)},{q(mo)},"
+    f"{HACE(m - r) if r else 'NULL'},{q(ca)},{q(co)},{HACE(m - r - 60) if ca else 'NULL'})"
+    for c, pe, cat, pr, es, m, msg, ia, u, so, rx, mo, r, ca, co in casos) + ";")
+w("INSERT INTO interaccion (id_cliente,id_usuario,id_tipo_interaccion,fecha,detalle) VALUES "
+  f"(1,2,5,{HACE(6 * 1440 - 70)},'Caso resuelto con nota de crédito por $120.000 (alerta de temperatura confirmada).');")
 
 print("\n".join(out))

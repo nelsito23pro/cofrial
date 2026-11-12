@@ -337,7 +337,7 @@
      "format": "table",
      "rawQuery": true,
      "editorMode": "code",
-     "rawSql": "SELECT COUNT(*) AS abiertos FROM requerimiento WHERE NOT resuelto"
+     "rawSql": "SELECT COUNT(*) AS abiertos FROM requerimiento WHERE estado <> 'Resuelto'"
     }
    ],
    "fieldConfig": {
