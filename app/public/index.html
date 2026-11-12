@@ -43,20 +43,21 @@ async function cargar() {
         <div class="mb-2"><span class="temp-chip">❄ ${x.temp_min} a ${x.temp_max} °C</span></div>
         <div class="precio">${CLP(x.precio)} <span class="small fw-normal text-muted">/ ${esc(x.unidad)} + IVA</span></div>
         <div class="small ${x.stock > 0 ? "text-success" : "text-danger"} mb-2">${x.stock > 0 ? "Stock: " + x.stock : "Sin stock"}</div>
-        <div class="input-group input-group-sm mt-auto">
+        ${SESION ? `<div class="input-group input-group-sm mt-auto">
           <input type="number" class="form-control" min="1" value="1" id="q${x.id_producto}">
           <button class="btn btn-primary" ${x.stock > 0 ? "" : "disabled"} onclick='agregar(${JSON.stringify({ id_producto: x.id_producto, nombre: x.nombre, unidad: x.unidad })})'>Agregar</button>
-        </div>
+        </div>` : `<a class="btn btn-sm btn-outline-primary mt-auto" href="/cuenta">Ingresar para comprar</a>`}
       </div></div></div>`).join("") || `<p class="text-muted">No hay productos con esos filtros.</p>`;
 }
 function agregar(prod) {
+  if (!SESION) { location.href = "/cuenta"; return; }   // comprar requiere sesión
   const q = Math.max(1, Number(document.getElementById("q" + prod.id_producto).value) || 1);
   Carrito.agregar(prod, q);
   aviso(`Agregado: ${q} ${esc(prod.unidad)} de ${esc(prod.nombre)}. <a href="/carrito">Ver carrito</a>`);
 }
 (async () => {
   const s = await cabecera();
-  document.getElementById("nota-precios").textContent = s ? `Estás viendo la lista de precios "${s.lista}".` : "Precios de lista pública. Inicia sesión como cliente B2B para ver tu lista institucional.";
+  document.getElementById("nota-precios").textContent = s ? `Estás viendo la lista de precios "${s.lista}".` : "Precios de lista pública. Inicia sesión para comprar; los clientes B2B ven su lista institucional.";
   (await api("/api/categorias")).forEach((c) => document.getElementById("f-cat").insertAdjacentHTML("beforeend", `<option value="${c.id_categoria}">${esc(c.nombre)}</option>`));
   ["f-cat", "f-temp"].forEach((id) => (document.getElementById(id).onchange = cargar));
   document.getElementById("f-q").oninput = () => { clearTimeout(window._t); window._t = setTimeout(cargar, 300); };

@@ -58,13 +58,10 @@ function cambiar(k, v) { const it = Carrito.leer(); it[k].cantidad = Math.max(1,
 function quitar(k) { const it = Carrito.leer(); it.splice(k, 1); Carrito.guardar(it); pintar(); }
 (async () => {
   const s = await cabecera();
+  if (!s) { location.href = "/cuenta?volver=/carrito"; return; }   // el carrito es solo para clientes con sesión
   (await api("/api/productos")).forEach((p) => (PRECIOS[p.id_producto] = p.precio));
   pintar();
   const btn = document.getElementById("confirmar");
-  if (!s) {
-    document.getElementById("despacho").innerHTML = `<div class="card-body">Para despachar tu pedido <a href="/cuenta?volver=/carrito">inicia sesión</a> o <a href="/registro?volver=/carrito">crea una cuenta</a> (B2B o B2C).</div>`;
-    btn.disabled = true; return;
-  }
   if (s.tipo === "B2B") {
     document.getElementById("caja-oc").classList.remove("d-none");
     document.getElementById("condicion").textContent = s.estado === "Activo" ? "Condición B2B: orden de compra y crédito a 30 días." : "Tu cuenta B2B está pendiente de aprobación por tu ejecutivo.";

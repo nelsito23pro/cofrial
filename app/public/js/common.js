@@ -44,10 +44,12 @@ async function cabecera(activa) {
     <div class="d-flex align-items-center gap-2 flex-wrap">
       <span class="text-white-50 small d-none d-md-inline">${SESION ? "Hola, " + esc(SESION.nombre) : "Cadena de frío inteligente"}</span>
       ${perfil}
-      <a class="btn btn-sm btn-outline-light" href="/carrito">🛒 Carrito (<span id="carrito-count">0</span>)</a>
+      ${SESION ? `<a class="btn btn-sm btn-outline-light" href="/carrito">🛒 Carrito (<span id="carrito-count">0</span>)</a>` : ""}
     </div></div></nav>`;
   const s = document.getElementById("salir");
-  if (s) s.onclick = async (e) => { e.preventDefault(); await api("/api/auth/logout", { method: "POST" }); location.href = "/"; };
+  if (s) s.onclick = async (e) => {   // al salir se vacía el carrito: en un computador compartido no debe verlo el siguiente usuario
+    e.preventDefault(); await api("/api/auth/logout", { method: "POST" }); Carrito.vaciar(); location.href = "/";
+  };
   pintarContador();
   montarChat();
   return SESION;
