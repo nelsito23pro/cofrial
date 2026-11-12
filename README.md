@@ -196,16 +196,17 @@ En el CRM, la sección **Flota y cadena de frío** muestra el mapa y las tempera
 Sin clave, el chat usa el **clasificador local** y funciona igual en la demo. Para usar un modelo de lenguaje real:
 
 1. Crea una clave gratuita:
-   - **Groq:** https://console.groq.com/keys. Recomendado: el modelo `llama-3.1-8b-instant` tiene un límite diario holgado.
+   - **Groq:** https://console.groq.com/keys. Modelo por defecto: `openai/gpt-oss-20b` (Groq retiró `llama-3.1-8b-instant` del plan gratuito el 16/08/2026).
    - **Gemini:** https://aistudio.google.com/apikey (modelo `gemini-3.5-flash-lite`).
 2. En el `.env` de la EC2 Web configura:
    ```
    AI_PROVIDER=groq
    AI_API_KEY=gsk_xxxxxxxxxxxxxxxx
-   AI_MODEL=llama-3.1-8b-instant
+   AI_MODEL=openai/gpt-oss-20b
    ```
 3. Aplica el cambio con `docker compose up -d` (recrea solo la app).
-4. Pruébalo: inicia sesión como cliente en la tienda, abre **Asistente IA** y escribe, por ejemplo, *"El pollo llegó blando y tibio"*. La respuesta muestra la categoría, la prioridad y el motor usado, y el caso aparece en **CRM → Requerimientos IA**.
+4. Pruébalo: inicia sesión como cliente en la tienda, abre **Asistente IA** y escribe, por ejemplo, *"El pollo llegó blando y tibio"*. La respuesta muestra la categoría, la prioridad y el motor usado (debe decir **motor groq** o **motor gemini**), y el caso aparece en **CRM → Casos de clientes (IA)**.
+5. Evidencia para la defensa: abre `http://ELASTIC_IP/api/health`. En `ia_detalle`, `ultimo_motor` muestra qué motor respondió el último mensaje y `ultimo_error` explica por qué se usó el respaldo local, si ocurrió.
 
 Si la API falla o llega al límite gratuito, el sistema usa automáticamente el clasificador local, así que la demo no se cae. Los nombres de modelos gratuitos cambian seguido: si uno deja de existir, cámbialo en `AI_MODEL`.
 

@@ -18,7 +18,7 @@ app.use(session({
 app.get("/api/health", async (req, res) => {
   try {
     const [[r]] = await pool.query("SELECT NOW() AS ahora, (SELECT COUNT(*) FROM telemetria) AS lecturas");
-    res.json({ ok: true, db: process.env.DB_HOST, ...r, ia: process.env.AI_PROVIDER || "local" });
+    res.json({ ok: true, db: process.env.DB_HOST, ...r, ia: process.env.AI_PROVIDER || "local", ia_detalle: require("./ai").estado });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }

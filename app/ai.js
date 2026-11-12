@@ -40,10 +40,10 @@ async function groq(mensaje) {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.AI_API_KEY}` },
     body: JSON.stringify({
-      model: process.env.AI_MODEL || "llama-3.1-8b-instant",
+      // llama-3.1-8b-instant fue retirado del plan gratuito de Groq el 16/08/2026; Groq recomienda openai/gpt-oss-20b
+      model: process.env.AI_MODEL || "openai/gpt-oss-20b",
       temperature: 0.2,
-      response_format: { type: "json_object" },
-      messages: [{ role: "user", content: PROMPT(mensaje) }],
+      messages: [{ role: "user", content: PROMPT(mensaje) }],   // el JSON se extrae de la respuesta con parse()
     }),
     signal: AbortSignal.timeout(15000),
   });
@@ -68,19 +68,29 @@ async function gemini(mensaje) {
   return parse(data.candidates[0].content.parts[0].text);
 }
 
+// Último uso de la IA (se muestra en /api/health para comprobar en la defensa qué motor respondió)
+const estado = { proveedor: (process.env.AI_PROVIDER || "local").toLowerCase(), modelo: null, ultimo_motor: null, ultimo_error: null, fecha: null };
+
 // Devuelve { categoria, prioridad, respuesta, motor }
 async function clasificar(mensaje) {
-  const prov = (process.env.AI_PROVIDER || "local").toLowerCase();
+  const prov = estado.proveedor;
+  const anotar = (r, error = null) => (Object.assign(estado, { ultimo_motor: r.motor, ultimo_error: error, fecha: new Date().toISOString() }), r);
   try {
-    if (prov === "groq" && process.env.AI_API_KEY) return { ...(await groq(mensaje)), motor: "groq" };
-    if (prov === "gemini" && process.env.AI_API_KEY) return { ...(await gemini(mensaje)), motor: "gemini" };
+    if (prov === "groq" && process.env.AI_API_KEY) {
+      estado.modelo = process.env.AI_MODEL || "openai/gpt-oss-20b";
+      return anotar({ ...(await groq(mensaje)), motor: "groq" });
+    }
+    if (prov === "gemini" && process.env.AI_API_KEY) {
+      estado.modelo = process.env.AI_MODEL || "gemini-3.5-flash-lite";
+      return anotar({ ...(await gemini(mensaje)), motor: "gemini" });
+    }
   } catch (err) {
     console.error("[IA] Falló el proveedor externo, se usa el clasificador local:", err.message);
-    return { ...local(mensaje), motor: "local (respaldo)" };
+    return anotar({ ...local(mensaje), motor: "local (respaldo)" }, err.message.slice(0, 200));
   }
-  return { ...local(mensaje), motor: "local" };
+  return anotar({ ...local(mensaje), motor: "local" });
 }
 
-module.exports = { clasificar, CATEGORIAS };
+module.exports = { clasificar, CATEGORIAS, estado };
 
 //cgfbdf
