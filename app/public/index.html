@@ -30,7 +30,7 @@
 <script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 <script src="/js/common.js"></script>
 <script>
-const ICONOS = { "Vacuno": "🥩", "Aves": "🍗", "Cerdo": "🥓", "Pescados y mariscos": "🐟", "Lácteos": "🥛", "Congelados preparados": "🍔", "Insumos hospitalarios": "🏥" };
+const ICONOS = { "Vacuno": "🥩", "Aves": "🍗", "Cerdo": "🥓", "Pescados y mariscos": "🐟", "Lácteos": "🥛", "Congelados preparados": "🍔" };
 async function cargar() {
   const p = new URLSearchParams({ categoria: document.getElementById("f-cat").value, q: document.getElementById("f-q").value, temp: document.getElementById("f-temp").value });
   const prods = await api("/api/productos?" + p);

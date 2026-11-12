@@ -153,7 +153,7 @@ nano .env                  # DB_HOST = endpoint de RDS, DB_PASS = clave maestra,
 bash scripts/cargar-bd.sh  # crea cofrial_db con 29 tablas, datos demo y vistas
 ```
 
-Si el script responde con 29 tablas, 16 productos, 9 clientes, 40 pedidos y 10 camiones, la conexión EC2 → RDS funciona y la seguridad está bien configurada.
+Si el script responde con 29 tablas, 14 productos, 9 clientes, 40 pedidos y 10 camiones, la conexión EC2 → RDS funciona y la seguridad está bien configurada.
 
 ### Paso 8. Levantar la tienda, el CRM y Grafana (en la EC2 Web)
 

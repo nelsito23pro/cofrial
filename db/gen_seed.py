@@ -40,7 +40,7 @@ w("INSERT INTO tipo_interaccion (id_tipo_interaccion,nombre) VALUES (1,'Llamada'
 w("INSERT INTO categoria_requerimiento (id_categoria_req,nombre) VALUES (1,'Pedido'),(2,'Reclamo'),(3,'Consulta'),(4,'Urgencia cadena de frío');")
 
 # ---------- productos ----------
-cats = ["Vacuno", "Aves", "Cerdo", "Pescados y mariscos", "Lácteos", "Congelados preparados", "Insumos hospitalarios"]
+cats = ["Vacuno", "Aves", "Cerdo", "Pescados y mariscos", "Lácteos", "Congelados preparados"]
 w("INSERT INTO categoria (id_categoria,nombre) VALUES " + ",".join(f"({i+1},{q(c)})" for i, c in enumerate(cats)) + ";")
 CONG, REF = (-25, -18), (0, 4)
 prods = [  # cat, sku, nombre, unidad, rango, precio neto B2C
@@ -51,7 +51,6 @@ prods = [  # cat, sku, nombre, unidad, rango, precio neto B2C
     (4, "PES-002", "Salmón porción congelada", "kg", CONG, 13990), (5, "LAC-001", "Leche UHT caja 12 x 1 L", "caja", REF, 13900),
     (5, "LAC-002", "Queso gauda laminado", "kg", REF, 8990), (5, "LAC-003", "Yogur natural 1 kg", "unidad", REF, 2490),
     (6, "PRE-001", "Hamburguesa de vacuno caja 4 kg", "caja", CONG, 18900), (6, "PRE-002", "Papas prefritas 2,5 kg", "unidad", CONG, 4990),
-    (7, "HOS-001", "Nutrición enteral refrigerada 1 L", "unidad", REF, 6990), (7, "HOS-002", "Gel refrigerante clínico", "caja", REF, 15900),
 ]
 w("INSERT INTO producto (id_producto,id_categoria,sku,nombre,descripcion,unidad,temp_min,temp_max) VALUES " + ",".join(
     f"({i+1},{c},{q(s)},{q(n)},{q('Producto de cadena de frío. Conservar entre ' + str(r[0]) + ' y ' + str(r[1]) + ' °C.')},{q(u)},{r[0]},{r[1]})"
