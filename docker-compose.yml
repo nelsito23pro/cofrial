@@ -28,9 +28,10 @@ services:
     image: grafana/grafana-oss:11.4.0
     container_name: cofrial-grafana
     restart: always
-    env_file: .env             # DB_HOST, DB_USER, DB_PASS se usan en el datasource aprovisionado
+    env_file: .env             # DB_HOST y GRAFANA_DB_USER/GRAFANA_DB_PASS (solo lectura) se usan en el datasource aprovisionado
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASS:-Cofrial2026!}
+      GRAFANA_DB_USER: ${GRAFANA_DB_USER:-grafana_ro}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASS:?Define GRAFANA_ADMIN_PASS en .env}
       GF_AUTH_ANONYMOUS_ENABLED: "true"        # el dashboard se puede ver sin login (modo demo)
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/cofrial.json

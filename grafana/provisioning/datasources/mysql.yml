@@ -4,7 +4,7 @@ datasources:
     uid: cofrial-mysql
     type: mysql
     url: ${DB_HOST}:${DB_PORT}
-    user: ${DB_USER}
+    user: ${GRAFANA_DB_USER}            # usuario de SOLO LECTURA (grafana_ro), no el admin de RDS
     database: ${DB_NAME}
     isDefault: true
     jsonData:
@@ -12,4 +12,4 @@ datasources:
       timezone: "${DB_TIMEZONE}"
       maxOpenConns: 10
     secureJsonData:
-      password: ${DB_PASS}
+      password: ${GRAFANA_DB_PASS}

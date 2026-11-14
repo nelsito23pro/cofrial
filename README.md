@@ -41,7 +41,7 @@ EC2 IoT (subred pública 10.0.2.0/24) ─ contenedores cam01 … cam05 (simulado
 | Tienda, cliente B2C | camila.rojas@mail.cl | Cliente2026! |
 | CRM, vendedora | vendedor@cofrial.cl | Cofrial2026! |
 | CRM, despacho / gerencia / admin | despacho@ · gerencia@ · admin@cofrial.cl | Cofrial2026! |
-| Grafana | admin | valor de `GRAFANA_ADMIN_PASS` (por defecto Cofrial2026!) |
+| Grafana | admin | la clave que definas en `GRAFANA_ADMIN_PASS` (no se publica en el repositorio) |
 
 ### Tarjetas de prueba de Webpay (ambiente de integración, sin dinero real)
 
@@ -163,10 +163,13 @@ Si usaste el *User data*, revisa que Docker esté listo con `docker compose vers
 cp .env.example .env
 nano .env                  # DB_HOST = endpoint de RDS, DB_PASS = clave maestra, SESSION_SECRET = texto aleatorio,
                            # DOMINIO = Elastic IP con guiones + .sslip.io (ej.: 34-238-200-122.sslip.io)
+                           # GRAFANA_ADMIN_PASS y GRAFANA_DB_PASS = dos claves nuevas, solo tuyas
 bash scripts/cargar-bd.sh  # crea cofrial_db con 31 tablas, datos demo y vistas
 ```
 
 Si el script responde con 31 tablas, 14 productos, 9 clientes, 40 pedidos y 10 camiones, la conexión EC2 → RDS funciona y la seguridad está bien configurada.
+
+El script también crea el usuario **`grafana_ro`**, de **solo lectura**, que usa Grafana. Como el dashboard es público, Grafana nunca se conecta con el usuario `admin`: `grafana_ro` solo puede leer las 9 tablas y vistas del dashboard. No ve `cliente` ni `usuario` (datos personales y contraseñas) y no puede modificar ni borrar nada (principio de mínimo privilegio).
 
 ### Paso 8. Levantar la tienda, el CRM y Grafana (en la EC2 Web)
 
@@ -255,7 +258,8 @@ Si la API falla o llega al límite gratuito, el sistema usa automáticamente el 
 | `compose build requires buildx` | Ejecuta `sudo bash scripts/preparar-ec2.sh` (instala buildx) y vuelve a conectarte por SSH. |
 | La página no abre desde el navegador | Falta la regla 443 u 80 en `sg-web`, la subred no es pública o usas la IP privada. |
 | El navegador dice que el certificado no es válido | Caddy no pudo obtener el certificado. Revisa `docker compose logs caddy`: el puerto 80 debe estar abierto en `sg-web` (Let's Encrypt valida por ahí) y `DOMINIO` debe coincidir con la Elastic IP. |
-| Grafana muestra *datasource error* | El `.env` de la raíz debe tener DB_HOST/DB_PORT/DB_USER/DB_PASS/DB_NAME. Después ejecuta `docker compose up -d --force-recreate grafana`. |
+| Grafana muestra *datasource error* | El `.env` de la raíz debe tener DB_HOST, DB_PORT, DB_NAME, GRAFANA_DB_USER y GRAFANA_DB_PASS, y el usuario `grafana_ro` debe existir (lo crea `bash scripts/cargar-bd.sh`). Después ejecuta `docker compose up -d --force-recreate grafana`. Evita el signo `$` en GRAFANA_DB_PASS. |
+| La clave de admin de Grafana no cambia | Grafana solo usa `GRAFANA_ADMIN_PASS` la primera vez. Para cambiarla después: `docker compose exec grafana grafana cli admin reset-admin-password 'NUEVA_CLAVE'`. |
 | Horas desfasadas 3 horas | Todos los componentes usan `DB_TIMEZONE=-03:00`. No cambies la zona en un solo lugar. |
 | El mapa del CRM sale gris | El navegador no pudo descargar los mosaicos de OpenStreetMap. Los datos y la tabla siguen funcionando. |
 | La IA responde con "motor local (respaldo)" | La clave es inválida, se alcanzó el límite gratuito o el modelo cambió de nombre. Revisa `docker compose logs app`. |
