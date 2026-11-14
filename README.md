@@ -10,9 +10,10 @@ Prototipo funcional del ecosistema diseñado en el Hito 1. Incluye:
 - **Business Intelligence en vivo:** dashboard en Grafana y panel BI dentro del CRM. Ambos cruzan las ventas (por día, canal y perfil) con las alertas de la cadena de frío.
 
 ```
-Internet ──► EC2 Web (subred pública 10.0.1.0/24)
-              ├─ contenedor app      :80   tienda + CRM + API + IA
-              └─ contenedor grafana  :3000 dashboard BI
+Internet ──HTTPS 443──► EC2 Web (subred pública 10.0.1.0/24)
+                         └─ contenedor caddy   :443/:80  certificado Let's Encrypt, redirige HTTP → HTTPS
+                              ├─ contenedor app      tienda + CRM + API + IA  (https://DOMINIO)
+                              └─ contenedor grafana  dashboard BI             (https://grafana.DOMINIO)
                          │ 3306
              Amazon RDS MySQL 8 (subredes privadas 10.0.11.0/24 y 10.0.12.0/24)
                          ▲ 3306
@@ -81,7 +82,7 @@ En **VPC → Security groups → Create**, todos dentro de la VPC `cofrial-vpc`:
 
 | Nombre | Reglas de entrada |
 | --- | --- |
-| `sg-web` | HTTP 80 desde 0.0.0.0/0 · TCP 3000 desde 0.0.0.0/0 (Grafana) · SSH 22 desde **My IP** |
+| `sg-web` | HTTPS 443 desde 0.0.0.0/0 · HTTP 80 desde 0.0.0.0/0 (Let's Encrypt y redirección a HTTPS) · SSH 22 desde **My IP** |
 | `sg-iot` | SSH 22 desde **My IP** (no recibe tráfico, solo envía) |
 | `sg-rds` | MySQL/Aurora 3306 con origen **sg-web** · MySQL/Aurora 3306 con origen **sg-iot** |
 
@@ -160,7 +161,8 @@ Si usaste el *User data*, revisa que Docker esté listo con `docker compose vers
 
 ```bash
 cp .env.example .env
-nano .env                  # DB_HOST = endpoint de RDS, DB_PASS = clave maestra, SESSION_SECRET = texto aleatorio
+nano .env                  # DB_HOST = endpoint de RDS, DB_PASS = clave maestra, SESSION_SECRET = texto aleatorio,
+                           # DOMINIO = Elastic IP con guiones + .sslip.io (ej.: 34-238-200-122.sslip.io)
 bash scripts/cargar-bd.sh  # crea cofrial_db con 31 tablas, datos demo y vistas
 ```
 
@@ -173,9 +175,11 @@ docker compose up -d --build
 bash scripts/verificar.sh
 ```
 
-- Tienda: `http://ELASTIC_IP/`
-- CRM: `http://ELASTIC_IP/crm`
-- Grafana: `http://ELASTIC_IP:3000/` (abre el dashboard *Cofrial · BI comercial y cadena de frío*)
+- Tienda: `https://DOMINIO/` (por ejemplo, `https://34-238-200-122.sslip.io/`)
+- CRM: `https://DOMINIO/crm`
+- Grafana: `https://grafana.DOMINIO/` (abre el dashboard *Cofrial · BI comercial y cadena de frío*)
+
+**HTTPS:** el contenedor `caddy` obtiene un certificado gratuito de Let's Encrypt para `DOMINIO` la primera vez que arranca (tarda unos segundos) y lo renueva solo. [sslip.io](https://sslip.io) resuelve `34-238-200-122.sslip.io` a la IP `34.238.200.122`, así que no hace falta comprar un dominio. Cualquier acceso por HTTP, incluso a la IP directa, se redirige a HTTPS. La app y Grafana ya no publican puertos: solo se llega a ellos a través de Caddy.
 
 Los contenedores tienen `restart: always`, así que vuelven a levantarse solos cuando el laboratorio reinicia la EC2. Eso cumple el requisito de backend persistente.
 
@@ -206,7 +210,7 @@ Sin clave, el chat usa el **clasificador local** y funciona igual en la demo. Pa
    ```
 3. Aplica el cambio con `docker compose up -d` (recrea solo la app).
 4. Pruébalo: inicia sesión como cliente en la tienda, abre **Asistente IA** y escribe, por ejemplo, *"El pollo llegó blando y tibio"*. La respuesta muestra la categoría, la prioridad y el motor usado (debe decir **motor groq** o **motor gemini**), y el caso aparece en **CRM → Casos de clientes (IA)**.
-5. Evidencia para la defensa: abre `http://ELASTIC_IP/api/health`. En `ia_detalle`, `ultimo_motor` muestra qué motor respondió el último mensaje y `ultimo_error` explica por qué se usó el respaldo local, si ocurrió.
+5. Evidencia para la defensa: abre `https://DOMINIO/api/health`. En `ia_detalle`, `ultimo_motor` muestra qué motor respondió el último mensaje y `ultimo_error` explica por qué se usó el respaldo local, si ocurrió.
 
 Si la API falla o llega al límite gratuito, el sistema usa automáticamente el clasificador local, así que la demo no se cae. Los nombres de modelos gratuitos cambian seguido: si uno deja de existir, cámbialo en `AI_MODEL`.
 
@@ -249,7 +253,8 @@ Si la API falla o llega al límite gratuito, el sistema usa automáticamente el 
 | `cargar-bd.sh` queda colgado o da *Can't connect* | `sg-rds` no permite 3306 desde `sg-web`/`sg-iot`, o RDS no está *Available*. Revisa también que DB_HOST sea el endpoint y no el nombre. |
 | `Authentication plugin 'caching_sha2_password'` | Usaste MySQL 8.4. Crea RDS con MySQL 8.0.x, o instala el cliente de MySQL en lugar de mariadb105. |
 | `compose build requires buildx` | Ejecuta `sudo bash scripts/preparar-ec2.sh` (instala buildx) y vuelve a conectarte por SSH. |
-| La página no abre desde el navegador | Falta la regla HTTP 80 o 3000 en `sg-web`, la subred no es pública o usas la IP privada. |
+| La página no abre desde el navegador | Falta la regla 443 u 80 en `sg-web`, la subred no es pública o usas la IP privada. |
+| El navegador dice que el certificado no es válido | Caddy no pudo obtener el certificado. Revisa `docker compose logs caddy`: el puerto 80 debe estar abierto en `sg-web` (Let's Encrypt valida por ahí) y `DOMINIO` debe coincidir con la Elastic IP. |
 | Grafana muestra *datasource error* | El `.env` de la raíz debe tener DB_HOST/DB_PORT/DB_USER/DB_PASS/DB_NAME. Después ejecuta `docker compose up -d --force-recreate grafana`. |
 | Horas desfasadas 3 horas | Todos los componentes usan `DB_TIMEZONE=-03:00`. No cambies la zona en un solo lugar. |
 | El mapa del CRM sale gris | El navegador no pudo descargar los mosaicos de OpenStreetMap. Los datos y la tabla siguen funcionando. |

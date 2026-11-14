@@ -1,0 +1,22 @@
+# Caddy: proxy inverso con HTTPS automático (Let's Encrypt) delante de la app y de Grafana.
+# Obtiene y renueva solo los certificados. DOMINIO viene del .env de la raíz.
+# En AWS se usa sslip.io, que da un dominio gratis a cualquier IP: 34-238-200-122.sslip.io -> 34.238.200.122
+# Sin DOMINIO (prueba local) usa "localhost" con un certificado interno de Caddy.
+
+# Tienda, CRM y API
+{$DOMINIO:localhost} {
+	encode gzip
+	reverse_proxy app:80
+}
+
+# Dashboard de Grafana
+grafana.{$DOMINIO:localhost} {
+	encode gzip
+	reverse_proxy grafana:3000
+}
+
+# Cualquier acceso por HTTP (por ejemplo, a la IP directa http://34.238.200.122) se redirige a la tienda con HTTPS.
+# Las validaciones de Let's Encrypt en el puerto 80 las atiende Caddy antes de esta regla.
+http:// {
+	redir https://{$DOMINIO:localhost}{uri} permanent
+}

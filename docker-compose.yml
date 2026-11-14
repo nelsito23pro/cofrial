@@ -1,12 +1,27 @@
-# Nodo WEB (EC2 en subred pública): backend + tienda + CRM (puerto 80) y Grafana BI (puerto 3000)
+# Nodo WEB (EC2 en subred pública): Caddy (HTTPS 443 / HTTP 80) delante de la app (tienda + CRM) y de Grafana BI
 # Uso:  docker compose up -d --build      ·  estado: docker compose ps   ·  logs: docker compose logs -f app
+# Solo Caddy publica puertos: la app y Grafana quedan en la red interna de Docker y se acceden por HTTPS.
 services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: cofrial-caddy
+    restart: always
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      DOMINIO: ${DOMINIO:-localhost}   # en AWS: 34-238-200-122.sslip.io (se define en .env)
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data               # certificados: se conservan entre reinicios (evita pedirlos de nuevo)
+      - caddy-config:/config
+    depends_on: [app, grafana]
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
   app:
     build: ./app
     container_name: cofrial-app
     restart: always            # se levanta solo cuando se reinicia la EC2 / el laboratorio
     env_file: .env
-    ports: ["80:80"]
+    expose: ["80"]             # solo accesible por Caddy
     logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
 
   grafana:
@@ -20,10 +35,13 @@ services:
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/cofrial.json
       GF_DATE_FORMATS_DEFAULT_TIMEZONE: browser
-    ports: ["3000:3000"]
+      GF_SERVER_ROOT_URL: https://grafana.${DOMINIO:-localhost}/
+    expose: ["3000"]           # solo accesible por Caddy
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
 volumes:
   grafana-data:
+  caddy-data:
+  caddy-config:

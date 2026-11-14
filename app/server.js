@@ -12,7 +12,8 @@ app.use(session({
   secret: process.env.SESSION_SECRET || "cambia-este-secreto",
   resave: false,
   saveUninitialized: false,
-  cookie: { httpOnly: true, sameSite: "lax", maxAge: 1000 * 60 * 60 * 8 },
+  // secure "auto": con HTTPS (Caddy) la cookie se marca Secure y nunca viaja sin cifrar; en local por HTTP sigue funcionando
+  cookie: { httpOnly: true, sameSite: "lax", secure: "auto", maxAge: 1000 * 60 * 60 * 8 },
 }));
 
 app.get("/api/health", async (req, res) => {
