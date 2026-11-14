@@ -10,7 +10,7 @@ async function iniciar() {
   $("v-login").style.display = "none"; $("v-app").style.display = "block";
   $("usuario").textContent = `${u.nombre} · ${u.rol}`;
   CAT = await api("/api/crm/catalogos");
-  CAT.estados.forEach((e) => $("p-estado-f").insertAdjacentHTML("beforeend", `<option>${esc(e.nombre)}</option>`));
+  $("p-estado-f").innerHTML = `<option value="">Todos los estados</option>` + CAT.estados.map((e) => `<option>${esc(e.nombre)}</option>`).join("");
   $("ruta-camion").innerHTML = CAT.camiones.map((c) => `<option value="${c.id}">${c.id} · ${esc(c.patente)} (${c.temp_min} a ${c.temp_max} °C)</option>`).join("");
   $("ruta-conductor").innerHTML = CAT.conductores.map((c) => `<option value="${c.id}">${esc(c.nombre)}</option>`).join("");
   $("sel-camion").innerHTML = CAT.camiones.map((c) => `<option>${c.id}</option>`).join("");
@@ -18,8 +18,17 @@ async function iniciar() {
 }
 $("f-login").onsubmit = async (e) => {
   e.preventDefault();
-  try { await api("/api/crm/login", { method: "POST", body: Object.fromEntries(new FormData(e.target)) }); iniciar(); }
-  catch (err) { $("login-error").textContent = err.message; }
+  const btn = $("crm-btn");
+  btn.disabled = true; btn.textContent = "Ingresando...";
+  $("login-error").textContent = "";
+  try {
+    await api("/api/crm/login", { method: "POST", body: { email: $("crm-email").value.trim(), password: $("crm-pass").value } });
+    await iniciar();   // si falla después del login (red lenta, servidor reiniciando) se muestra el error en vez de quedar en blanco
+  } catch (err) {
+    $("login-error").textContent = err.message === "Credenciales inválidas"
+      ? "Email o contraseña incorrectos. Usa una cuenta del personal (@cofrial.cl), no una de cliente."
+      : `No se pudo ingresar: ${err.message}. Intenta de nuevo en unos segundos.`;
+  } finally { btn.disabled = false; btn.textContent = "Ingresar"; }
 };
 $("salir").onclick = async (e) => { e.preventDefault(); await api("/api/crm/logout", { method: "POST" }); location.reload(); };
 
@@ -379,4 +388,8 @@ async function cargarFlota() {
 }
 $("sel-camion").onchange = () => { if (CHARTS["c-temp"]) { CHARTS["c-temp"].destroy(); delete CHARTS["c-temp"]; } cargarFlota(); };
 
-iniciar();
+// Si el servidor no responde al abrir la página (por ejemplo, el laboratorio recién encendido), se muestra el login con un aviso
+iniciar().catch((err) => {
+  $("v-login").style.display = "block"; $("v-app").style.display = "none";
+  $("login-error").textContent = `El servidor no respondió (${err.message}). Recarga la página en unos segundos.`;
+});

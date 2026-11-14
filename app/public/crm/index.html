@@ -13,11 +13,12 @@
   <h2 class="fw-bold text-center mb-1">❄ COFRIAL CRM</h2>
   <p class="text-center text-muted">Acceso para vendedores, despacho y gerencia</p>
   <form id="f-login" class="card card-body border-0 shadow-sm">
-    <input class="form-control mb-2" name="email" type="email" placeholder="Email" required>
-    <input class="form-control mb-3" name="password" type="password" placeholder="Contraseña" required>
-    <button class="btn btn-primary">Ingresar</button>
+    <input class="form-control mb-2" id="crm-email" name="email" type="email" placeholder="Email del personal (@cofrial.cl)" autocomplete="username" required>
+    <input class="form-control mb-3" id="crm-pass" name="password" type="password" placeholder="Contraseña" autocomplete="current-password" required>
+    <button class="btn btn-primary" id="crm-btn">Ingresar</button>
+    <p class="small text-muted mt-2 mb-0">Si el navegador rellena la contraseña solo, revisa que no sea la de una cuenta de cliente de la tienda.</p>
   </form>
-  <div id="login-error" class="text-danger text-center mt-2"></div>
+  <div id="login-error" class="text-danger text-center mt-2" role="alert"></div>
 </div>
 
 <!-- Aplicación -->
