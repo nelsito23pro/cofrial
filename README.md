@@ -1,294 +1,111 @@
-# Cofrial SpA · Hito 2: despliegue práctico en AWS Academy
+# Cofrial SpA · Hito 2: despliegue en AWS Academy
 
-Prototipo funcional del ecosistema diseñado en el Hito 1. Incluye:
+Prototipo funcional del ecosistema digital de Cofrial SpA, distribuidora de alimentos refrigerados y congelados.
 
-- **E-commerce B2B/B2C:** catálogo de productos refrigerados con listas de precios por perfil, carrito de compras, checkout (orden de compra y crédito para B2B, pago con **Webpay Plus** para B2C) y generación de órdenes.
-- **CRM operativo:** clientes y prospectos, aprobación de cuentas B2B, pipeline Kanban, pedidos web con despacho y requerimientos.
-- **IA de costo cero:** chat que clasifica requerimientos y les asigna prioridad. Funciona con Groq o Gemini (capas gratuitas) y tiene un clasificador local de respaldo.
-- **Gestión de casos de clientes:** cada mensaje del chat es un caso con plazo según prioridad (Alta 2 h, Media 24 h, Baja 72 h). El ejecutivo ve el pedido y la **evidencia IoT del camión que lo despachó**, y lo resuelve con reposición sin costo, reembolso Webpay, nota de crédito o respuesta. El cliente sigue el caso en *Mis casos* y califica la atención (1 a 5 ⭐).
-- **Simulación IoT:** contenedores Docker (uno por camión) en una EC2 dedicada. Cada contenedor inserta cada 5 s en RDS `camion_id`, `temp_camara`, `lat`, `lon`, `combustible_pct` y `alerta_ruptura_frio`.
-- **Business Intelligence en vivo:** dashboard en Grafana y panel BI dentro del CRM. Ambos cruzan las ventas (por día, canal y perfil) con las alertas de la cadena de frío.
+- **E-commerce B2B/B2C:** catálogo con listas de precios por perfil. Los clientes B2B compran con orden de compra y los B2C pagan con **Webpay Plus**.
+- **CRM:** clientes y prospectos, aprobación de cuentas B2B, pipeline Kanban y pedidos con despacho.
+- **IA:** chat que clasifica los mensajes de los clientes (Groq o Gemini, con un clasificador local de respaldo).
+- **Gestión de casos:** cada mensaje es un caso con plazo según su prioridad. El ejecutivo ve la evidencia IoT del despacho y lo resuelve con reposición, reembolso o nota de crédito; el cliente califica la atención.
+- **IoT:** un contenedor Docker por camión envía cada 5 s temperatura, ubicación, combustible y alerta de ruptura de frío a RDS.
+- **BI en vivo:** Grafana y un panel en el CRM cruzan las ventas con las alertas de la cadena de frío.
 
 ```
 Internet ──HTTPS 443──► EC2 Web (subred pública 10.0.1.0/24)
-                         └─ contenedor caddy   :443/:80  certificado Let's Encrypt, redirige HTTP → HTTPS
-                              ├─ contenedor app      tienda + CRM + API + IA  (https://DOMINIO)
-                              └─ contenedor grafana  dashboard BI             (https://grafana.DOMINIO)
+                         └─ caddy (HTTPS con Let's Encrypt)
+                              ├─ app      tienda + CRM + API + IA   https://DOMINIO
+                              └─ grafana  dashboard BI              https://grafana.DOMINIO
                          │ 3306
              Amazon RDS MySQL 8 (subredes privadas 10.0.11.0/24 y 10.0.12.0/24)
                          ▲ 3306
-EC2 IoT (subred pública 10.0.2.0/24) ─ contenedores cam01 … cam05 (simulador.py)
+EC2 IoT (subred pública 10.0.2.0/24) ─ contenedores cam01 … cam05
 ```
 
-## Estructura del proyecto
+## Estructura
 
 | Carpeta / archivo | Contenido |
 | --- | --- |
-| `db/01_schema.sql` | Esquema MySQL 8 en 3FN (31 tablas): el MER del Hito 1 más `pago` (Webpay) y `tipo_solucion` (gestión de casos) |
-| `db/02_seed.sql` | Datos de demostración: productos, listas de precios, clientes, 40 pedidos, 10 camiones y 14 días de telemetría (se regenera con `gen_seed.py`) |
-| `db/03_views.sql` | Vistas para el BI: totales de pedido, ventas diarias, alertas diarias, cruce ventas vs. alertas, última lectura de cada camión y casos con su plazo (`v_caso`) |
-| `app/` | Backend Node.js + Express, páginas de la tienda y del CRM, integración con IA (`ai.js`) y pasarela Webpay Plus (`routes/pagos.js`) |
-| `iot/` | Simulador Python, Dockerfile y `docker-compose.yml` del nodo IoT |
-| `grafana/` | Datasource y dashboard aprovisionados automáticamente |
-| `docker-compose.yml` | Nodo Web: contenedores `app` y `grafana` |
-| `scripts/` | `preparar-ec2.sh` (instala Docker), `cargar-bd.sh` (inicializa RDS), `verificar.sh` (chequeo de salud) |
+| `app/` | Backend Node.js + Express, tienda, CRM, IA (`ai.js`) y Webpay (`routes/pagos.js`) |
+| `db/` | Esquema en 3FN (31 tablas), datos de demostración (`gen_seed.py`) y vistas para el BI |
+| `iot/` | Simulador de camiones en Python y su `docker-compose.yml` |
+| `grafana/` | Datasource y dashboard aprovisionados |
+| `caddy/` | Proxy HTTPS (`Caddyfile`) |
+| `docker-compose.yml` | Nodo Web: `caddy`, `app` y `grafana` |
+| `scripts/` | `preparar-ec2.sh` (instala Docker), `cargar-bd.sh` (inicializa RDS), `verificar.sh` (chequeo) |
+| `docs/MER.md` | Modelo entidad-relación |
 
-## Credenciales de demostración
+## Cuentas de demostración
 
 | Dónde | Usuario | Clave |
 | --- | --- | --- |
-| Tienda, cliente B2B (Institucional Salud) | compras@hospitalaraucania.cl | Cliente2026! |
 | Tienda, cliente B2C | camila.rojas@mail.cl | Cliente2026! |
-| CRM, vendedora | vendedor@cofrial.cl | Cofrial2026! |
-| CRM, despacho / gerencia / admin | despacho@ · gerencia@ · admin@cofrial.cl | Cofrial2026! |
-| Grafana | admin | la clave que definas en `GRAFANA_ADMIN_PASS` (no se publica en el repositorio) |
+| Tienda, cliente B2B | compras@hospitalaraucania.cl | Cliente2026! |
+| CRM | vendedor@cofrial.cl · despacho@ · gerencia@ · admin@cofrial.cl | Cofrial2026! |
 
-### Tarjetas de prueba de Webpay (ambiente de integración, sin dinero real)
-
-| Tarjeta | Número | CVV | Vencimiento | Resultado |
-| --- | --- | --- | --- | --- |
-| VISA crédito | 4051 8856 0044 6623 | 123 | cualquier fecha futura | Aprobada |
-| Redcompra débito | 4051 8842 3993 7763 | — | — | Aprobada |
-| Mastercard crédito | 5186 0595 5959 0568 | 123 | cualquier fecha futura | Rechazada |
-
-Cuando Webpay pida autenticación, usa RUT **11.111.111-1** y clave **123**.
+Webpay usa el ambiente de pruebas de Transbank, sin dinero real. Tarjeta aprobada: VISA **4051 8856 0044 6623**, CVV 123, cualquier fecha futura. Tarjeta rechazada: Mastercard **5186 0595 5959 0568**. Autenticación: RUT **11.111.111-1**, clave **123**.
 
 ---
 
-## Paso a paso en AWS Academy (Learner Lab)
+## Despliegue en AWS Academy
 
-> Inicia el laboratorio (**Start Lab**), espera a que el indicador quede en verde y abre la consola con **AWS**. Trabaja en la región **us-east-1 (N. Virginia)**.
+Región **us-east-1**. Inicia el laboratorio con **Start Lab** y espera el indicador verde.
 
-### Paso 1. Crear la VPC (≈ 5 min)
+**1. VPC.** *VPC → Create VPC → VPC and more:* nombre `cofrial`, CIDR `10.0.0.0/16`, 2 zonas, subredes públicas `10.0.1.0/24` y `10.0.2.0/24`, privadas `10.0.11.0/24` y `10.0.12.0/24`, sin NAT gateway. Activa *auto-assign public IPv4* en las dos públicas.
 
-1. Abre **VPC → Create VPC** y elige **VPC and more**.
-2. Completa estos campos:
-   - Name tag: `cofrial`
-   - IPv4 CIDR: `10.0.0.0/16`
-   - Number of AZs: **2**
-   - Public subnets: **2**
-   - Private subnets: **2**
-   - NAT gateways: **None** (tiene costo por hora; así queda justificado en el Hito 1)
-   - VPC endpoints: **None**
-3. En **Customize subnets CIDR blocks** usa los rangos del Hito 1:
-   - Públicas: `10.0.1.0/24` y `10.0.2.0/24`
-   - Privadas: `10.0.11.0/24` y `10.0.12.0/24`
-4. Presiona **Create VPC**. El asistente crea el Internet Gateway y las tablas de ruteo.
-5. Abre **Subnets**, selecciona cada subred pública y activa **Edit subnet settings → Enable auto-assign public IPv4 address**.
+**2. Security Groups** (en `cofrial-vpc`):
 
-### Paso 2. Security Groups (≈ 5 min)
-
-En **VPC → Security groups → Create**, todos dentro de la VPC `cofrial-vpc`:
-
-| Nombre | Reglas de entrada |
+| Nombre | Entrada |
 | --- | --- |
-| `sg-web` | HTTPS 443 desde 0.0.0.0/0 · HTTP 80 desde 0.0.0.0/0 (Let's Encrypt y redirección a HTTPS) · SSH 22 desde **My IP** |
-| `sg-iot` | SSH 22 desde **My IP** (no recibe tráfico, solo envía) |
-| `sg-rds` | MySQL/Aurora 3306 con origen **sg-web** · MySQL/Aurora 3306 con origen **sg-iot** |
+| `sg-web` | HTTPS 443 y HTTP 80 desde 0.0.0.0/0 · SSH 22 desde *My IP* |
+| `sg-iot` | SSH 22 desde *My IP* |
+| `sg-rds` | MySQL 3306 desde `sg-web` y desde `sg-iot` |
 
-La salida (outbound) queda abierta por defecto en los tres.
+El puerto 80 es necesario: Let's Encrypt valida el certificado por ahí y además redirige a HTTPS.
 
-### Paso 3. Base de datos Amazon RDS (≈ 15 min, mientras tanto sigue con el paso 4)
+**3. RDS.** Crea un *DB subnet group* con las dos subredes privadas. Luego crea la base: MySQL **8.0.x**, `db.t3.micro`, Single-AZ, identificador `cofrial-db`, usuario `admin`, **Public access: No**, security group `sg-rds`. Copia el *Endpoint* cuando esté *Available*.
 
-1. Abre **RDS → Subnet groups → Create DB subnet group**.
-   - Nombre: `cofrial-db-subnets`
-   - VPC: `cofrial-vpc`
-   - Subredes: las dos **privadas** (us-east-1a y us-east-1b)
-2. Abre **RDS → Create database → Standard create** y configura:
-   - Engine: **MySQL**. Usa la versión **8.0.x**, que trae autenticación compatible con el cliente de Amazon Linux.
-   - Template: **Free tier**, o **Dev/Test** si Free tier no aparece.
-   - DB instance identifier: `cofrial-db`
-   - Master username: `admin`. Define una clave y anótala.
-   - Instancia: `db.t3.micro` (o `db.t4g.micro`). Storage: 20 GB gp2/gp3, sin autoscaling.
-   - Disponibilidad: **Single-AZ**. Es el trade-off documentado en el Hito 1.
-   - Connectivity:
-     - VPC: `cofrial-vpc`
-     - Subnet group: `cofrial-db-subnets`
-     - **Public access: No**
-     - Security group: **sg-rds** (quita el default)
-   - Additional configuration:
-     - Backup retention: 7 días
-     - Desactiva *Enhanced monitoring* si AWS Academy reclama permisos.
-3. Cuando el estado sea **Available**, copia el **Endpoint** desde *Connectivity & security*.
+**4. EC2.** Crea dos instancias Amazon Linux 2023 con key pair `vockey`, perfil `LabInstanceProfile` y el contenido de `scripts/preparar-ec2.sh` como *User data*:
+- `cofrial-web`: subred pública 1a, `sg-web`. Asóciale una **Elastic IP**.
+- `cofrial-iot`: subred pública 1b, `sg-iot`.
 
-### Paso 4. EC2 Web (≈ 5 min)
-
-1. Abre **EC2 → Launch instance** y configura:
-   - Nombre: `cofrial-web`
-   - AMI: **Amazon Linux 2023**
-   - Tipo: `t2.micro` (o `t3.small` si tu laboratorio lo permite; Grafana y la app corren más holgados).
-   - Key pair: **vockey**. La descargas desde *AWS Details* del Learner Lab.
-2. En **Network settings → Edit**:
-   - VPC: `cofrial-vpc`
-   - Subred: pública **us-east-1a**
-   - Auto-assign public IP: Enable
-   - Security group existente: **sg-web**
-3. En **Advanced details**:
-   - IAM instance profile: **LabInstanceProfile**
-   - **User data:** pega el contenido de `scripts/preparar-ec2.sh`. Así Docker queda instalado solo.
-4. Abre **Elastic IPs → Allocate** y asóciala a `cofrial-web`. Con eso la URL no cambia al reiniciar el laboratorio.
-
-### Paso 5. EC2 IoT (≈ 3 min)
-
-Igual que el paso 4, con estas diferencias:
-
-- Nombre: `cofrial-iot`
-- Subred: pública **us-east-1b**
-- Security group: **sg-iot**
-- Mismo *User data*
-
-### Paso 6. Subir el código a las EC2
-
-**Opción A, recomendada:** sube esta carpeta a un repositorio de GitHub del grupo y clónalo en cada EC2:
-
+**5. Código.** En cada EC2:
 ```bash
-ssh -i labsuser.pem ec2-user@IP_EC2
-git clone https://github.com/TU_USUARIO/cofrial-hito2.git
-cd cofrial-hito2
+gh repo clone nelsito23pro/cofrial    # o git clone https://github.com/nelsito23pro/cofrial.git
+cd cofrial
 ```
 
-**Opción B:** copia el zip desde tu computador:
-
-```bash
-scp -i labsuser.pem cofrial-hito2.zip ec2-user@IP_EC2:~
-ssh -i labsuser.pem ec2-user@IP_EC2
-unzip cofrial-hito2.zip && cd cofrial-hito2
-```
-
-Si usaste el *User data*, revisa que Docker esté listo con `docker compose version`. Si no lo usaste, ejecuta `sudo bash scripts/preparar-ec2.sh`, sal de SSH y vuelve a entrar.
-
-### Paso 7. Inicializar la base de datos (en la EC2 Web)
-
+**6. Base de datos y nodo Web** (EC2 Web):
 ```bash
 cp .env.example .env
-nano .env                  # DB_HOST = endpoint de RDS, DB_PASS = clave maestra, SESSION_SECRET = texto aleatorio,
-                           # DOMINIO = Elastic IP con guiones + .sslip.io (ej.: 34-238-200-122.sslip.io)
-                           # GRAFANA_ADMIN_PASS y GRAFANA_DB_PASS = dos claves nuevas, solo tuyas
-bash scripts/cargar-bd.sh  # crea cofrial_db con 31 tablas, datos demo y vistas
-```
-
-Si el script responde con 31 tablas, 14 productos, 9 clientes, 40 pedidos y 10 camiones, la conexión EC2 → RDS funciona y la seguridad está bien configurada.
-
-El script también crea el usuario **`grafana_ro`**, de **solo lectura**, que usa Grafana. Como el dashboard es público, Grafana nunca se conecta con el usuario `admin`: `grafana_ro` solo puede leer las 9 tablas y vistas del dashboard. No ve `cliente` ni `usuario` (datos personales y contraseñas) y no puede modificar ni borrar nada (principio de mínimo privilegio).
-
-### Paso 8. Levantar la tienda, el CRM y Grafana (en la EC2 Web)
-
-```bash
+nano .env                    # completa DB_HOST, DB_PASS, SESSION_SECRET, DOMINIO, GRAFANA_ADMIN_PASS y GRAFANA_DB_PASS
+bash scripts/cargar-bd.sh    # 31 tablas, datos de demostración, vistas y usuario grafana_ro
 docker compose up -d --build
 bash scripts/verificar.sh
 ```
+`DOMINIO` es la Elastic IP con guiones más `.sslip.io` (por ejemplo, `34-238-200-122.sslip.io`). Caddy obtiene y renueva solo el certificado HTTPS. Grafana se conecta con `grafana_ro`, un usuario de **solo lectura** limitado a las tablas del dashboard: no ve clientes ni usuarios y no puede modificar nada.
 
-- Tienda: `https://DOMINIO/` (por ejemplo, `https://34-238-200-122.sslip.io/`)
-- CRM: `https://DOMINIO/crm`
-- Grafana: `https://grafana.DOMINIO/` (abre el dashboard *Cofrial · BI comercial y cadena de frío*)
-
-**HTTPS:** el contenedor `caddy` obtiene un certificado gratuito de Let's Encrypt para `DOMINIO` la primera vez que arranca (tarda unos segundos) y lo renueva solo. [sslip.io](https://sslip.io) resuelve `34-238-200-122.sslip.io` a la IP `34.238.200.122`, así que no hace falta comprar un dominio. Cualquier acceso por HTTP, incluso a la IP directa, se redirige a HTTPS. La app y Grafana ya no publican puertos: solo se llega a ellos a través de Caddy.
-
-Los contenedores tienen `restart: always`, así que vuelven a levantarse solos cuando el laboratorio reinicia la EC2. Eso cumple el requisito de backend persistente.
-
-### Paso 9. Encender la flota IoT (en la EC2 IoT)
-
+**7. Flota IoT** (EC2 IoT):
 ```bash
-cd cofrial-hito2/iot
-cp .env.example .env
-nano .env                  # mismo DB_HOST / DB_USER / DB_PASS de RDS
+cd cofrial/iot
+cp .env.example .env && nano .env    # mismo DB_HOST, DB_USER y DB_PASS de RDS
 docker compose up -d --build
-docker compose logs -f     # verás una línea por lectura de cada camión (Ctrl+C para salir)
+docker compose logs -f               # una línea por lectura de cada camión
 ```
+CAM-03 falla más seguido para que haya alertas. Para sumar camiones, copia una línea en `iot/docker-compose.yml` (CAM-06 a CAM-10 ya existen en la base).
 
-En el CRM, la sección **Flota y cadena de frío** muestra el mapa y las temperaturas en vivo, y marca en rojo los camiones con alerta de ruptura de frío. `CAM-03` tiene mayor probabilidad de falla para que la demo muestre alertas. Para sumar camiones, copia una línea en `iot/docker-compose.yml` (CAM-06 a CAM-10 ya existen en la BD).
+**8. IA (opcional).** Sin clave se usa el clasificador local. Con una clave gratuita de [Groq](https://console.groq.com/keys) o [Gemini](https://aistudio.google.com/apikey), configura en el `.env` de la EC2 Web `AI_PROVIDER`, `AI_API_KEY` y `AI_MODEL` (por defecto `openai/gpt-oss-20b` y `gemini-3.5-flash-lite`) y ejecuta `docker compose up -d`. `https://DOMINIO/api/health` muestra qué motor respondió el último mensaje.
 
-### Paso 10. Activar la IA gratuita
-
-Sin clave, el chat usa el **clasificador local** y funciona igual en la demo. Para usar un modelo de lenguaje real:
-
-1. Crea una clave gratuita:
-   - **Groq:** https://console.groq.com/keys. Modelo por defecto: `openai/gpt-oss-20b` (Groq retiró `llama-3.1-8b-instant` del plan gratuito el 16/08/2026).
-   - **Gemini:** https://aistudio.google.com/apikey (modelo `gemini-3.5-flash-lite`).
-2. En el `.env` de la EC2 Web configura:
-   ```
-   AI_PROVIDER=groq
-   AI_API_KEY=gsk_xxxxxxxxxxxxxxxx
-   AI_MODEL=openai/gpt-oss-20b
-   ```
-3. Aplica el cambio con `docker compose up -d` (recrea solo la app).
-4. Pruébalo: inicia sesión como cliente en la tienda, abre **Asistente IA** y escribe, por ejemplo, *"El pollo llegó blando y tibio"*. La respuesta muestra la categoría, la prioridad y el motor usado (debe decir **motor groq** o **motor gemini**), y el caso aparece en **CRM → Casos de clientes (IA)**.
-5. Evidencia para la defensa: abre `https://DOMINIO/api/health`. En `ia_detalle`, `ultimo_motor` muestra qué motor respondió el último mensaje y `ultimo_error` explica por qué se usó el respaldo local, si ocurrió.
-
-Si la API falla o llega al límite gratuito, el sistema usa automáticamente el clasificador local, así que la demo no se cae. Los nombres de modelos gratuitos cambian seguido: si uno deja de existir, cámbialo en `AI_MODEL`.
-
----
-
-## Guion sugerido para la defensa (≈ 7 minutos, sigue la rúbrica)
-
-1. **Despliegue cloud.** Muestra en la consola AWS la VPC, las dos EC2 *running*, RDS *Available* con *Public access: No* y las reglas de `sg-rds`. Ejecuta `bash scripts/verificar.sh`.
-2. **E-commerce B2C.** Sin sesión, navega el catálogo. Luego ingresa como `camila.rojas@mail.cl`, muestra el precio público, agrega productos y presiona **Pagar con Webpay**. Paga con la VISA de prueba: el pedido vuelve *Confirmado* y en el CRM aparece con el pago *Aprobado* y la tarjeta `**** 6623`.
-3. **E-commerce B2B.** Cierra sesión e ingresa como `compras@hospitalaraucania.cl`. El precio cambia a la lista Institucional Salud. Agrega productos, pon una orden de compra y confirma el pedido.
-4. **CRM.**
-   - Entra en otra pestaña a `/crm` como vendedora.
-   - En **Pedidos web**, el pedido recién creado aparece *Pendiente*. Pásalo a *En ruta*, asígnale el camión `CAM-03` y luego márcalo *Entregado*.
-   - En la tienda, el cliente ve el estado en **Mis pedidos**.
-5. **Registro B2B y pipeline.**
-   - Registra una empresa nueva en `/registro` (perfil B2B). Queda *pendiente*.
-   - En el CRM aparece como prospecto y en el pipeline. Apruébala desde su ficha, asignándole una lista de precios.
-   - Cuando la empresa compre, la oportunidad pasa sola a *Ganada*.
-6. **IoT.** En **Flota y cadena de frío**, muestra el mapa, las temperaturas y las alertas en vivo. En la EC2 IoT, ejecuta `docker compose ps` y `docker compose logs --tail 5`.
-7. **BI.**
-   - En el **Panel BI** del CRM o en Grafana, muestra el cruce de ventas diarias con alertas de frío, las ventas por canal (Web vs. CRM vs. Teléfono), B2B vs. B2C y las alertas por camión.
-   - Destaca que el panel se actualiza solo.
-8. **IA y gestión de casos.**
-   - Como `camila.rojas@mail.cl`, en **Mis pedidos** presiona **⚠ Reportar un problema** en un pedido entregado y escribe *"el lomo vetado llegó en mal estado"*. La IA lo clasifica como reclamo de prioridad **Alta** (plazo 2 h).
-   - En el CRM, abre **Casos de clientes (IA)** y presiona **Gestionar**. Muestra el pedido, el pago y la **evidencia IoT**: temperatura del camión durante el despacho y sus alertas. El caso N° 1 de los datos demo tiene una alerta real de CAM-03.
-   - Resuélvelo con **Reposición**: se crea un pedido sin costo y se descuenta stock. En la tienda, el cliente ve la respuesta en **Mis casos** y califica con estrellas.
-   - En el **Panel BI**, sección *Atención al cliente*, muestra casos abiertos, vencidos, tiempo promedio, % en plazo y satisfacción.
-
-## Qué hacer cada vez que se inicia el laboratorio
-
-1. Presiona **Start Lab** y espera el indicador verde. Las EC2 se encienden y los contenedores arrancan solos.
-2. Revisa en la consola que RDS esté **Available** (puede tardar unos minutos en reanudarse).
-3. Si RDS tardó más que los contenedores, la app reintenta sola. Si algo quedó caído, ejecuta `docker compose restart` en cada EC2.
-4. Para dejar la demo como nueva antes de la defensa, ejecuta `bash scripts/cargar-bd.sh`. Recrea los datos de prueba.
+**Al iniciar el laboratorio:** las EC2 y los contenedores arrancan solos (`restart: always`). Espera a que RDS esté *Available*. Para dejar la demo como nueva, ejecuta `bash scripts/cargar-bd.sh`.
 
 ## Solución de problemas
 
-| Síntoma | Causa probable y solución |
+| Síntoma | Solución |
 | --- | --- |
-| `cargar-bd.sh` queda colgado o da *Can't connect* | `sg-rds` no permite 3306 desde `sg-web`/`sg-iot`, o RDS no está *Available*. Revisa también que DB_HOST sea el endpoint y no el nombre. |
-| `Authentication plugin 'caching_sha2_password'` | Usaste MySQL 8.4. Crea RDS con MySQL 8.0.x, o instala el cliente de MySQL en lugar de mariadb105. |
-| `compose build requires buildx` | Ejecuta `sudo bash scripts/preparar-ec2.sh` (instala buildx) y vuelve a conectarte por SSH. |
-| La página no abre desde el navegador | Falta la regla 443 u 80 en `sg-web`, la subred no es pública o usas la IP privada. |
-| El navegador dice que el certificado no es válido | Caddy no pudo obtener el certificado. Revisa `docker compose logs caddy`: el puerto 80 debe estar abierto en `sg-web` (Let's Encrypt valida por ahí) y `DOMINIO` debe coincidir con la Elastic IP. |
-| Grafana muestra *datasource error* | El `.env` de la raíz debe tener DB_HOST, DB_PORT, DB_NAME, GRAFANA_DB_USER y GRAFANA_DB_PASS, y el usuario `grafana_ro` debe existir (lo crea `bash scripts/cargar-bd.sh`). Después ejecuta `docker compose up -d --force-recreate grafana`. Evita el signo `$` en GRAFANA_DB_PASS. |
-| La clave de admin de Grafana no cambia | Grafana solo usa `GRAFANA_ADMIN_PASS` la primera vez. Para cambiarla después: `docker compose exec grafana grafana cli admin reset-admin-password 'NUEVA_CLAVE'`. |
-| Horas desfasadas 3 horas | Todos los componentes usan `DB_TIMEZONE=-03:00`. No cambies la zona en un solo lugar. |
-| El mapa del CRM sale gris | El navegador no pudo descargar los mosaicos de OpenStreetMap. Los datos y la tabla siguen funcionando. |
-| La IA responde con "motor local (respaldo)" | La clave es inválida, se alcanzó el límite gratuito o el modelo cambió de nombre. Revisa `docker compose logs app`. |
-
-## Evidencias sugeridas para el informe del Hito 2
-
-1. **Consola AWS.** Captura estas pantallas:
-   - Mapa de recursos de la VPC.
-   - Subredes, tabla de ruteo con el IGW.
-   - Reglas de los tres Security Groups.
-   - RDS con *Public access: No*.
-   - Las dos EC2 *running* con su Elastic IP.
-2. **Terminal.** Captura:
-   - `docker compose ps` en ambas EC2.
-   - `docker compose logs` del simulador.
-   - La salida de `scripts/verificar.sh`.
-3. **Aplicación.** Captura:
-   - Catálogo B2C y B2B, con precios distintos.
-   - Carrito y confirmación del pedido.
-   - Pipeline, pedidos y ficha de cliente en el CRM.
-   - Flota con una alerta.
-   - Panel BI y dashboard de Grafana.
-   - Chat IA y requerimiento clasificado.
-
-## Prueba local opcional (antes de ir a AWS)
-
-Con Docker Desktop y una base MySQL 8 local:
-
-1. Carga los tres scripts de `db/`.
-2. Crea `.env` con `DB_HOST=host.docker.internal`.
-3. Ejecuta `docker compose up --build`.
-4. Abre `http://localhost`.
+| `cargar-bd.sh` no conecta | RDS no está *Available* o `sg-rds` no permite 3306 desde `sg-web`/`sg-iot`. |
+| `caching_sha2_password` | Crea RDS con MySQL 8.0.x. |
+| `compose build requires buildx` | `sudo bash scripts/preparar-ec2.sh` y vuelve a entrar por SSH. |
+| La página no abre | Faltan las reglas 443/80 en `sg-web` o usas la IP privada. |
+| Certificado no válido | `docker compose logs caddy`: el puerto 80 debe estar abierto y `DOMINIO` debe coincidir con la Elastic IP. |
+| Grafana: *datasource error* | Revisa `GRAFANA_DB_USER`/`GRAFANA_DB_PASS` (sin `$`), ejecuta `cargar-bd.sh` y luego `docker compose up -d --force-recreate grafana`. |
+| Cambiar la clave de admin de Grafana | `docker compose exec grafana grafana cli admin reset-admin-password 'NUEVA_CLAVE'` |
+| La IA dice "motor local (respaldo)" | Clave inválida, límite gratuito o modelo retirado: `docker compose logs app`. |
+| El mapa del CRM sale gris | No cargaron los mosaicos de OpenStreetMap; los datos siguen funcionando. |
